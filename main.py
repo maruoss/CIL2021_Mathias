@@ -7,11 +7,10 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
+from numpy.ma import concatenate
 
 import torch
-from torch import optim
-from torch.nn.modules import loss
-import torchvision
+from torch import nn
 import torchvision.transforms as transforms
 
 from PIL import Image
@@ -53,13 +52,12 @@ transform_fn = transforms.Compose(
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)) # Normalize for deeplabv3
     ])
 
-# Image Transform function
+# Target Transform function
 target_transform_fn = transforms.Compose(
-    [transforms.ToTensor(),
+    [
+    transforms.ToTensor(),
     # transforms.Normalize((0.5), (0.5)) # Normalize to [-1, 1]
     ])
-
-
 
 
 
@@ -96,15 +94,16 @@ class CustomDataset(torch.utils.data.Dataset):
         # im = np.moveaxis(im, -1, 0) # not needed with ToTensor() self.transforms
 
         # Transform to tensor, attach to device
+        # Images
         if self.transforms:
             im = self.transforms(im).to(self.device)
-        # else:
-        #     im = torch.from_numpy(im).to(self.device)
 
+        # Targets
         if self.target_transforms:
             gt = self.target_transforms(gt).to(self.device)
         # else:
         #     gt = torch.from_numpy(gt).to(self.device)
+        #     gt = gt.unsqueeze(0) / 255. # add channel dimension of 1
 
         return im, gt
 
@@ -118,8 +117,8 @@ class CustomDataset(torch.utils.data.Dataset):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Instantiate Datasets for train and validation
-train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, device, transform_fn, target_transform_fn)
-val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, device, transform_fn, target_transform_fn)
+train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, device, transform_fn, target_transforms=target_transform_fn)
+val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, device, transform_fn, target_transforms=target_transform_fn)
 
 # Instantiate Loaders for these datasets, # SET BATCH SIZE HERE
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True)
@@ -128,25 +127,22 @@ val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=2, shuffle=
 
 # %%
 
-# # Display image and labels
-# train_features, train_labels = next(iter(train_dataloader))
-# print(f"Feature batch shape: {train_features.size()}")
-# print(f"Labels batch shape: {train_labels.size()}")
-# img = torch.moveaxis(train_features[0], 0, -1) #Select first image out of batch, reshape CHW to HWC (plt.imshow needs shape H, W, C)
-# label = train_labels[0] # Select first label out of shape BHW
-# # Show image, .cpu() otherwise imshow doesnt work with cuda
-# plt.imshow(img.cpu())
-# plt.show()
-# # Squeeze only if target_transform is provided -> transformed int into torch.float [0, 1] range, and added channel
-# label = label.squeeze()
-# # Show groundtruth in greyscale (original interpretation)
-# plt.imshow(label.cpu(), cmap="gray") 
-# plt.show()
+# Display image and labels
+train_features, train_labels = next(iter(train_dataloader))
+print(f"Feature batch shape: {train_features.size()}")
+print(f"Labels batch shape: {train_labels.size()}")
+img = torch.moveaxis(train_features[0], 0, -1) #Select first image out of batch, reshape CHW to HWC (plt.imshow needs shape H, W, C)
+label = train_labels[0] # Select first label out of shape BHW
+# Show image, .cpu() otherwise imshow doesnt work with cuda
+plt.imshow(img.cpu())
+plt.show()
+# Squeeze only if target_transform is provided -> transformed int into torch.float [0, 1] range, and added channel
+label = label.squeeze()
+# Show groundtruth in greyscale (original interpretation)
+plt.imshow(label.cpu(), cmap="gray") 
+plt.show()
 
 # %%
-
-# Define model
-from torch import nn
 
 # class FirstNet(nn.Module):
 #     def __init__(self):
@@ -171,10 +167,6 @@ from torch import nn
 # from torchinfo import summary ->have to install with Pip, ideally after every other necessary package is installed with conda
 torch.empty(3).random_(2)
 
-# %%
-# model = FirstNet().to(device) #add to GPU
-# print(model) # Look at structure of model
-
 
 # %%
 # # Test output with Loss functions
@@ -188,6 +180,7 @@ torch.empty(3).random_(2)
 # %%
 from torchvision import models
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
+from torchvision.models.segmentation.fcn import FCNHead
 
 
 # Function to load deeplabv3 pretrained and change outputchannel of its classifier head to number of classes
@@ -196,106 +189,201 @@ def createDeepLabHead(outputchannels= 1):
 
     model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True)
     model.classifier = DeepLabHead(2048, outputchannels) # Adjust classifier head, resnet101 has backbone output of 2048
-
+    model.aux_classifier = FCNHead(1024, outputchannels) # Adjust aux classifier
     return model
 
 
 # %%
 # Predict one instance, without learning anything
+# model = createDeepLabHead()
 # model.to(device)
 # model.eval()
 # img = train_features[0] # Take first image from DataLoader
 # img = img.unsqueeze(0) # Unsqueeze for batch size = 1 -> [1, C, H, W]
 # print(img.shape)
-# out = model(img)["out"].cpu()
+# with torch.no_grad():
+#     out = model(img)["out"].cpu()
+# print(out.shape)
 # plt.imshow(out.squeeze().detach().numpy(), cmap="gray")
+# plt.imshow(np.concatenate([np.moveaxis(out.detach().numpy(), 0, -1)]*3, -1).squeeze())
+
+# %%
+# np.unique(out.detach().numpy())[-5:]
+# %%
+
+# plt.imshow(np.concatenate([np.moveaxis(out.detach().numpy(), 1, -1)]*3, -1).squeeze())
+
+# # %% 
+
+# plt.imshow((torch.moveaxis(torch.sigmoid(out), 1, -1)).squeeze(0))
+
+# # %%
+# # Normalize to [0, 1]
+# def normalize(x):
+#     x = (x - np.min(x)) / (np.max(x) - np.min(x))
+#     return x
+
+# plt.imshow(normalize(np.concatenate([np.moveaxis(out.detach().numpy(), 1, -1)]*3, -1).squeeze()))
+
+# plt.imshow(transforms.ToPILImage()(torch.cat([torch.moveaxis(out, 0, -1)]*3, 0).squeeze()))
+
+
+
+
+
+# %%
+def show_val_samples(x, y, y_hat, segmentation=False):
+    # training callback to show predictions on validation set
+    imgs_to_draw = min(5, len(x))
+    if x.shape[-2:] == y.shape[-2:]:  # segmentation
+        fig, axs = plt.subplots(3, imgs_to_draw, figsize=(18.5, 12))
+        for i in range(imgs_to_draw):
+            # print(np.unique(x)[:5], np.unique(y)[:5], np.unique(y_hat)[:5]) x has values from ~[-2, +2], y_hat [-0.5, +0.5], y [0, 1]
+            # Image plot
+            axs[0, i].imshow(np.moveaxis(x[i], 0, -1)) # Yields clipping warning, as deeplabv3 has input floats of <0 and >1
+
+            # Target plots
+            # axs[1, i].imshow(np.moveaxis(y_hat[i], 0, -1), cmap="gray") # Equal now. Yields too much "white" somehow -> because of no sigmoid!
+            # axs[2, i].imshow(np.moveaxis(y[i], 0, -1), cmap="gray") # Equal now. Yielded too much "white" somehow -> because of no sigmoid!
+            axs[1, i].imshow(np.concatenate([np.moveaxis(y_hat[i], 0, -1)] * 3, -1)) # No warning now. yielded clipping warning -> because of no sigmoid func. in predictions!
+            axs[2, i].imshow(np.concatenate([np.moveaxis(y[i], 0, -1)]*3, -1))
+
+            axs[0, i].set_title(f'Sample {i}')
+            axs[1, i].set_title(f'Predicted {i}')
+            axs[2, i].set_title(f'True {i}')
+            axs[0, i].set_axis_off()
+            axs[1, i].set_axis_off()
+            axs[2, i].set_axis_off()
+    # else:  # classification
+        # fig, axs = plt.subplots(1, imgs_to_draw, figsize=(18.5, 6))
+        # for i in range(imgs_to_draw):
+        #     axs[i].imshow(np.moveaxis(x[i], 0, -1))
+        #     axs[i].set_title(f'True: {np.round(y[i]).item()}; Predicted: {np.round(y_hat[i]).item()}')
+        #     axs[i].set_axis_off()
+    plt.show()
 
 # %%
 
-# Training for one epoch
-def train_epoch(model, dataloader, optimizer=None, loss_fn=None): # no lr as param., will be set at optimizer instantiation in main file
-    """train one epoch"""
-    model.train() # Set in train mode
-    total_loss, acc, count = 0, 0, 0 # Initialize train metrics
-    for features, labels in tqdm(dataloader):
-        optimizer.zero_grad() # Zero out gradients
-        out = model(features)["out"] # Forward pass (run feature batch through model, get prediction), ["out"] because deeplabv3 returns OrderedDict
-        loss = loss_fn(out, labels) # Calculate scalar loss
-        loss.backward() # Backward pass (backpropagate loss)
-        optimizer.step() # Take step towards negative gradient w.r.t model parameters
-
-        # Collect metrics of total batch
-        total_loss += loss
-        acc += (out.round() == labels.round()).float().mean() # Round to closest integer, compare Bool to Float, take mean
-        count += 1 # since loss and acc are already means over batch
-        print("count train:", count)
-        print("accuracy train:", acc.item())
-    return total_loss.item()/ count, acc.item()/ count # Means over epoch, acc/loss already takes mean over batch (.item() takes value from tensor)
+def accuracy_fn(y_hat, y):
+    # computes classification accuracy
+    return (y_hat.round() == y.round()).float().mean()
 
 
-# Evaluate on val dataset
-def val(model, dataloader, loss_fn=None):
-    model.eval() # Set in eval mode, important!
-    loss, acc, count = 0, 0, 0 # Initialize val metrics
-    with torch.no_grad(): # Stop tracking computation on tensors
-        for features, labels in tqdm(dataloader):
-            out = model(features)["out"] # Forward pass (run feature batch through model, get prediction), ["out"] because deeplabv3 returns OrderedDict
-            loss += loss_fn(out, labels) # Calculate scalar loss
-            # no backward pass!
+def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, n_epochs):
+    # training loop
+    # logdir = './tensorboard/net'
+    # writer = SummaryWriter(logdir)  # tensorboard writer (can also log images)
+    since = time.time()
 
-            # Metrics
-            acc += (out.round() == labels.round()).float().mean() # Round to closest integer, compare Bool to Float, take mean
-            count += 1 # since loss and acc are already means over batch
-            print("count val:", count)
-            print("accuracy val:", acc.item())
-    return loss.item()/ count, acc.item()/ count # Means over epoch, acc already takes mean/loss over batch (.item() takes value from tensor)
+    history = {}  # collects metrics at the end of each epoch
+
+    for epoch in range(n_epochs):  # loop over the dataset multiple times
+
+        # initialize metric list
+        metrics = {'loss': [], 'val_loss': []}
+        for k, _ in metric_fns.items():
+            metrics[k] = []
+            metrics['val_'+k] = []
+
+        pbar = tqdm(train_dataloader, desc=f'Epoch {epoch+1}/{n_epochs}')
+        # training
+        model.train()
+        for (x, y) in pbar:
+            optimizer.zero_grad()  # zero out gradients
+            y_hat = model(x)["out"]  # forward pass #MATHIAS: ADJUSTED "OUT"
+            loss = loss_fn(y_hat, y)
+            loss.backward()  # backward pass
+            optimizer.step()  # optimize weights
+
+            # log partial metrics
+            metrics['loss'].append(loss.item())
+            assert str(loss_fn) == "BCEWithLogitsLoss()" # Otherwise, torch sigmoid is not necessary here, e.g. with BCELoss  
+            y_hat = torch.sigmoid(y_hat) # For metrics, torch.sigmoid needed!
+            for k, fn in metric_fns.items():
+                metrics[k].append(fn(y_hat, y).item()) # TORCH SIGMOID HERE AS WELL -> LIKE A PREDICTION
+            pbar.set_postfix({k: sum(v)/len(v) for k, v in metrics.items() if len(v) > 0})
+
+        # validation
+        model.eval()
+        with torch.no_grad():  # do not keep track of gradients
+            for (x, y) in eval_dataloader:
+                # probability of pixel being 0 or 1:
+                y_hat = model(x)["out"] # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
+                loss = loss_fn(y_hat, y)
+                
+                # log partial metrics
+                metrics['val_loss'].append(loss.item())
+                assert str(loss_fn) == "BCEWithLogitsLoss()" # Otherwise, torch sigmoid is not necessary here, e.g. with BCELoss  
+                y_hat = torch.sigmoid(y_hat) # For metrics, torch.sigmoid needed!
+                for k, fn in metric_fns.items():
+                    metrics['val_'+k].append(fn(y_hat, y).item())
+
+        # summarize metrics, log to tensorboard and display
+        history[epoch] = {k: sum(v) / len(v) for k, v in metrics.items()}
+        # for k, v in history[epoch].items():
+        #   writer.add_scalar(k, v, epoch)
+        print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()]))
+        show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy())
+
+    print('Finished Training')
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+        time_elapsed // 60, time_elapsed % 60))
+
+    plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
+    plt.plot([v['val_loss'] for k, v in history.items()], label='Validation Loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epochs')
+    plt.legend()
+    plt.show()
 
 
-# Full training
-def train(model, train_dataloader, val_dataloader, optimizer=None, loss_fn=None, epochs=5): # no lr as param., will be set at optimizer instantiation in main file
-    # Initialize metric dict
-    res = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+# %%
+metric_fns = {'acc': accuracy_fn}
 
-    # Run through epochs
-    for epoch in range(epochs):
-        tl, ta = train_epoch(model, train_dataloader, optimizer=optimizer, loss_fn=loss_fn) # Get train batch mean results
-        vl, va = val(model, val_dataloader, loss_fn=loss_fn) # Get val batch mean results
-        
-        # Print losses and metrics (used f strings: :2 -> integer, .3f -> 3 decimal floats)
-        print(f"Epoch: {epoch+1:2}/{epochs:2}, Train loss={tl:.3f}, Train acc={ta:.3f}, Val loss={vl:.3f}, Val acc={va:.3f}")
-        # Collect losses and metric in metric dict
-        res["train_loss"].append(tl)
-        res["train_acc"].append(ta)
-        res["val_loss"].append(vl)
-        res["val_acc"].append(va)
-    return res
-
-        
 # %%
 
 # Instantiate model
 model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
 model.to(device) #add to gpu
 
-# Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-# Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
-loss_fn = nn.BCELoss()
-
 # Finetuning or Feature extraction? Freeze backbone of resnet101
 for x in model.backbone.parameters():
     x.requires_grad = False
 
-# %% 
-# Train
-train(model, train_dataloader, val_dataloader, optimizer=optimizer, loss_fn=loss_fn)
-
+# Instantiate optimizer
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+# Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
+loss_fn = nn.BCEWithLogitsLoss()
 
 
 # %%
+# Train
+train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+             metric_fns=metric_fns, optimizer=optimizer, n_epochs=20)
 
-for x in model.parameters():
-    x.requires_grad = False
+# %%
+
+model
+
+
+
+
+
+# *****************************************************************************************************
+# %%
+from torch import nn
+a = nn.BCEWithLogitsLoss()
+
+
+#%%
+
+str(a)
+
+# %%
+
+if str(a) == "BCEWithLogitsLoss":
+    print("yes")
 
 
 # %%
@@ -318,7 +406,6 @@ labelround = label.round().mean()
 
 # %%
 
-import torch
 # print the version of CUDA being used by pytorch
 # print(torch.version.cuda)
 # !nvidia-smi
@@ -345,7 +432,7 @@ import torch
 # %%
 a = torch.tensor([[2., 3.], [4, 5]])
 # %%
-a
+print("x", "\n\nb")
 
 # %%
 a.mean(1, keepdim=True)
@@ -369,71 +456,6 @@ b["val"].append(1)
 
 # %%
 
-def accuracy_fn(y_hat, y):
-    # computes classification accuracy
-    return (y_hat.round() == y.round()).float().mean()
-
-
-def train_tutorial(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, n_epochs):
-    # training loop
-    # logdir = './tensorboard/net'
-    # writer = SummaryWriter(logdir)  # tensorboard writer (can also log images)
-
-    history = {}  # collects metrics at the end of each epoch
-
-    for epoch in range(n_epochs):  # loop over the dataset multiple times
-
-        # initialize metric list
-        metrics = {'loss': [], 'val_loss': []}
-        for k, _ in metric_fns.items():
-            metrics[k] = []
-            metrics['val_'+k] = []
-
-        pbar = tqdm(train_dataloader, desc=f'Epoch {epoch+1}/{n_epochs}')
-        # training
-        model.train()
-        for (x, y) in pbar:
-            optimizer.zero_grad()  # zero out gradients
-            y_hat = model(x)["out"]  # forward pass #MATHIAS: ADJUSTED "OUT"
-            loss = loss_fn(y_hat, y)
-            loss.backward()  # backward pass
-            optimizer.step()  # optimize weights
-
-            # log partial metrics
-            metrics['loss'].append(loss.item())
-            for k, fn in metric_fns.items():
-                metrics[k].append(fn(y_hat, y).item())
-            pbar.set_postfix({k: sum(v)/len(v) for k, v in metrics.items() if len(v) > 0})
-
-        # validation
-        model.eval()
-        with torch.no_grad():  # do not keep track of gradients
-            for (x, y) in eval_dataloader:
-                y_hat = model(x)["out"] # forward pass #MATHIAS: ADJUSTED "OUT"
-                loss = loss_fn(y_hat, y)
-                
-                # log partial metrics
-                metrics['val_loss'].append(loss.item())
-                for k, fn in metric_fns.items():
-                    metrics['val_'+k].append(fn(y_hat, y).item())
-
-        # summarize metrics, log to tensorboard and display
-        history[epoch] = {k: sum(v) / len(v) for k, v in metrics.items()}
-        # for k, v in history[epoch].items():
-        #   writer.add_scalar(k, v, epoch)
-        print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()]))
-        # show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy())
-
-    print('Finished Training')
-# %%
-metric_fns = {'acc': accuracy_fn}
-
-train_tutorial(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, n_epochs=5)
-
-
-# %%
-
 a = 0
 
 # %%
@@ -441,4 +463,140 @@ a = 0
 a += torch.tensor([1])
 
 # %%
-a
+a = {"test":1}
+# %%
+b = {"train": 2}
+# %%
+
+c = a | b
+# %%
+
+img, label = next(iter(train_dataloader))
+# %%
+
+img.shape
+
+
+# %%
+
+test = np.concatenate([img[0]]*10, -1)
+# %%
+
+# %%
+test.shape
+# %%
+
+plt.imshow(np.concatenate([np.moveaxis(label[0].detach().cpu().numpy(), 0, -1)] * 3, -1))
+
+
+# %%
+plt.imshow(label[0].squeeze().detach().cpu().numpy(), cmap="gray")
+
+# %%
+
+a = np.array([1, 2, 3, 4])
+# %%
+b= np.array([5, 6, 7, 8])
+# %%
+print(a.head(), b.head())
+# %%
+
+
+a = np.array(([1, 2], [3, 4]))
+# %%
+
+b = torch.from_numpy(a)
+
+
+# %%
+
+b.float()
+
+
+# %%
+# # Training for one epoch
+# def train_epoch(model, dataloader, optimizer=None, metric_fns=None, loss_fn=None, epoch=None, epochs=None): # no lr as param., will be set at optimizer instantiation in main file
+#     """train one epoch"""
+#     model.train() # Set in train mode
+
+#      # initialize metric list
+#     metrics = {'loss': []}
+#     for k, _ in metric_fns.items():
+#         metrics[k] = []
+    
+#     # Define progressbar for training
+#     pbar = tqdm(dataloader, desc=f'Epoch {epoch+1}/{epochs}')
+
+#     for features, labels in pbar:
+#         optimizer.zero_grad() # Zero out gradients
+#         out = model(features)["out"] # Forward pass (run feature batch through model, get prediction), ["out"] because deeplabv3 returns OrderedDict
+#         loss = loss_fn(out, labels) # Calculate scalar loss
+#         loss.backward() # Backward pass (backpropagate loss)
+#         optimizer.step() # Take step towards negative gradient w.r.t model parameters
+
+#          # log partial metrics
+#         metrics['loss'].append(loss.item())
+#         for k, fn in metric_fns.items():
+#             metrics[k].append(fn(out, labels).item())
+#         pbar.set_postfix({k: sum(v)/len(v) for k, v in metrics.items() if len(v) > 0})
+
+#     # return total_loss.item()/ count, acc.item()/ count # Means over epoch, acc/loss already takes mean over batch (.item() takes value from tensor)
+#     return {k: sum(v) / len(v) for k, v in metrics.items()}
+
+# # Evaluate on val dataset
+# def val(model, dataloader, metric_fns=None, loss_fn=None):
+#     model.eval() # Set in eval mode, important!
+
+#     # initialize metric list
+#     metrics = {'val_loss': []}
+#     for k, _ in metric_fns.items():
+#         metrics['val_'+k] = []
+
+#     with torch.no_grad(): # Stop tracking computation on tensors
+#         for features, labels in tqdm(dataloader):
+#             out = model(features)["out"] # Forward pass (run feature batch through model, get prediction), ["out"] because deeplabv3 returns OrderedDict
+#             loss = loss_fn(out, labels) # Calculate scalar loss
+#             # no backward pass!
+
+#             # log partial metrics
+#             metrics['val_loss'].append(loss.item())
+#             for k, fn in metric_fns.items():
+#                 metrics['val_'+k].append(fn(out, labels).item())
+
+#     return {k: sum(v) / len(v) for k, v in metrics.items()} # Means over epoch, acc already takes mean/loss over batch (.item() takes value from tensor)
+
+
+# # Full training
+# def train(model, train_dataloader, val_dataloader, optimizer=None, metric_fns=None, loss_fn=None, epochs=5): # no lr as param., will be set at optimizer instantiation in main file
+    
+#     since = time.time()
+    
+#     # Initialize hist metric dict
+#     history = {}  # collects metrics at the end of each epoch
+
+#     # Run through epochs
+#     for epoch in range(epochs):
+#         train_metrics_dict = train_epoch(model, train_dataloader, optimizer=optimizer, metric_fns=metric_fns, loss_fn=loss_fn, epoch=epoch, epochs=epochs) # Get train batch mean results
+#         val_metrics_dict = val(model, val_dataloader, metric_fns=metric_fns, loss_fn=loss_fn) # Get val batch mean results
+        
+
+#         # summarize metrics, log to tensorboard and display
+#         history[epoch] = train_metrics_dict | val_metrics_dict # Taking the union of dicts, needs Python >= 3.9.0
+#         # for k, v in history[epoch].items():
+#         #   writer.add_scalar(k, v, epoch)
+#         print(' '.join(['\n- '+str(k)+' = '+str(v) for (k, v) in history[epoch].items()]))
+#         # show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy())
+
+#     print('Finished Training')
+#     time_elapsed = time.time() - since
+#     print('Training complete in {:.0f}m {:.0f}s'.format(
+#         time_elapsed // 60, time_elapsed % 60))
+
+# # Define classification accuracy (whole image)
+# def accuracy_fn(y_hat, y):
+#     # computes classification accuracy
+#     return (y_hat.round() == y.round()).float().mean()
+
+
+# Train
+# train(model, train_dataloader, val_dataloader, optimizer=optimizer, metric_fns=metric_fns, loss_fn=loss_fn, epochs=1)
