@@ -7,7 +7,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
-from numpy.ma import concatenate
 
 import torch
 from torch import nn
@@ -144,6 +143,18 @@ plt.show()
 
 # %%
 
+# 400  // 16
+
+# %%
+a = train_labels.reshape(-1, 25, 16, 25, 16).mean((-1, -3)) > 0.25
+
+b = train_labels.reshape(-1, 25, 16, 25, 16).mean((-1, -3)) > 0.25
+
+(a == b).float().mean()
+
+
+# %%
+
 # class FirstNet(nn.Module):
 #     def __init__(self):
 #         super().__init__()
@@ -212,23 +223,15 @@ def createDeepLabHead(outputchannels= 1):
 # %%
 
 # plt.imshow(np.concatenate([np.moveaxis(out.detach().numpy(), 1, -1)]*3, -1).squeeze())
-
-# # %% 
-
 # plt.imshow((torch.moveaxis(torch.sigmoid(out), 1, -1)).squeeze(0))
 
-# # %%
 # # Normalize to [0, 1]
 # def normalize(x):
 #     x = (x - np.min(x)) / (np.max(x) - np.min(x))
 #     return x
 
 # plt.imshow(normalize(np.concatenate([np.moveaxis(out.detach().numpy(), 1, -1)]*3, -1).squeeze()))
-
 # plt.imshow(transforms.ToPILImage()(torch.cat([torch.moveaxis(out, 0, -1)]*3, 0).squeeze()))
-
-
-
 
 
 # %%
@@ -263,11 +266,6 @@ def show_val_samples(x, y, y_hat, segmentation=False):
     plt.show()
 
 # %%
-
-def accuracy_fn(y_hat, y):
-    # computes classification accuracy
-    return (y_hat.round() == y.round()).float().mean()
-
 
 def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, n_epochs):
     # training loop
@@ -348,13 +346,26 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
         plt.show()
 
 
+# Metric functions
+def accuracy_fn(y_hat, y):
+    # computes classification accuracy
+    return (y_hat.round() == y.round()).float().mean()
+
+
+def patch_accuracy(y_hat, y):
+    # computes accuracy weighted by patches
+    h_patches = y.shape[-2] // PATCH_SIZE # Global variable
+    w_patches = y.shape[-1] // PATCH_SIZE
+
+    patches_hat = y_hat.reshape(-1, 1, h_patches, PATCH_SIZE, w_patches, PATCH_SIZE).mean((-1, -3)) > CUTOFF
+    patches = y.reshape(-1, 1, h_patches, PATCH_SIZE, w_patches, PATCH_SIZE).mean((-1, -3)) > CUTOFF
+
+    return (patches_hat == patches).float().mean()
+
+
+
 # %%
 metric_fns = {'acc': accuracy_fn}
-
-# %% 
-
-# for k, _ in metric_fns.items():
-#     a = k
 
 # %%
 
@@ -385,11 +396,11 @@ dict1 = {"test": 1, "train": 2}
 for k, v in dict1.items():
     print(k, v)
 
-# %%
 
-a = "train"
 
-print("get"+str(a))
+# %% 
+
+test(2)
 
 # *****************************************************************************************************
 # %%
