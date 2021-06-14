@@ -121,8 +121,8 @@ train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, device
 val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, device, transform_fn, target_transforms=target_transform_fn)
 
 # Instantiate Loaders for these datasets, # SET BATCH SIZE HERE
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True)
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=2, shuffle=True)
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=True)
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=8, shuffle=True)
 
 
 # %%
@@ -330,6 +330,7 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
 
+    # Show plot for losses
     plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
     plt.plot([v['val_loss'] for k, v in history.items()], label='Validation Loss')
     plt.ylabel('Loss')
@@ -337,9 +338,23 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
     plt.legend()
     plt.show()
 
+    # Show plots for all additional metrics
+    for k, _ in metric_fns.items():
+        plt.plot([v[k] for _, v in history.items()], label='Training '+k)
+        plt.plot([v["val_"+k] for _, v in history.items()], label='Validation '+k)
+        plt.ylabel(k)
+        plt.xlabel('Epochs')
+        plt.legend()
+        plt.show()
+
 
 # %%
 metric_fns = {'acc': accuracy_fn}
+
+# %% 
+
+# for k, _ in metric_fns.items():
+#     a = k
 
 # %%
 
@@ -352,7 +367,7 @@ for x in model.backbone.parameters():
     x.requires_grad = False
 
 # Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
 loss_fn = nn.BCEWithLogitsLoss()
 
@@ -360,15 +375,21 @@ loss_fn = nn.BCEWithLogitsLoss()
 # %%
 # Train
 train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, n_epochs=20)
+             metric_fns=metric_fns, optimizer=optimizer, n_epochs=2)
 
 # %%
 
-model
+dict1 = {"test": 1, "train": 2}
 
+# %%
+for k, v in dict1.items():
+    print(k, v)
 
+# %%
 
+a = "train"
 
+print("get"+str(a))
 
 # *****************************************************************************************************
 # %%
