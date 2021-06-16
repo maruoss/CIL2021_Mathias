@@ -28,7 +28,8 @@ import random
 # Define random seeds
 random_seed = 343
 torch.manual_seed(17)
-# random.seed(1222)
+# random.seed(1222) # also needed for transforms.RandomRotation.get_params...
+# np.random.seed(0) # global numpy RNG
 
 # Define root to current working directory + "/Data"
 root = Path.cwd() / 'Data'
@@ -114,14 +115,14 @@ class CustomDataset(torch.utils.data.Dataset):
         # Training Augmentation
         if train:
             # 1. Random resize crop
-            top = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
-            left = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
-            height = random.randint(200, img_size[1])
-            width = random.randint(200, img_size[1])
+            # top = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
+            # left = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
+            # height = random.randint(200, img_size[1])
+            # width = random.randint(200, img_size[1])
+            i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.3, 1.0), ratio=(0.75, 1.333))
             size = self.resize_to
-
-            image = TF.resized_crop(image, top=top, left=left, height=height, width=width, size=size)
-            segmentation = TF.resized_crop(segmentation, top=top, left=left, height=height, width=width, size=size)
+            image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=size)
+            segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=size)
 
             # 2. Rotation
             if random.random() > 0.5: # Adjust
@@ -134,19 +135,24 @@ class CustomDataset(torch.utils.data.Dataset):
                 image = TF.hflip(image)
                 segmentation = TF.hflip(segmentation)
 
-            # 4. Random Grayscale
+            # 4. Vertical flip
+            if random.random() > 0.5: # Adjust prob.
+                image = TF.vflip(image)
+                segmentation = TF.vflip(segmentation)
+
+            # 5. Random Grayscale
             if random.random() > 0.5:
                 image = TF.rgb_to_grayscale(image, num_output_channels=3)
                 # not needed for segmentation mask        
 
-            # 5. Gaussian Blur
+            # 6. Gaussian Blur
             if random.random() > 0.5:
                 sigma = random.uniform(0.1, 2.)
                 kernel_size = random.randrange(3, 50, 2)
                 image = TF.gaussian_blur(image, kernel_size=kernel_size, sigma=sigma)
                 # not needed for segmentation mask
 
-            # 6. ColorJitter: Adjust brightness, contrast, saturation, hue
+            # 7. ColorJitter: Adjust brightness, contrast, saturation, hue
             if random.random() > 0.5:
                 brightness = random.uniform(0.5, 2)
                 image = TF.adjust_brightness(image, brightness_factor=brightness)
@@ -161,13 +167,13 @@ class CustomDataset(torch.utils.data.Dataset):
                 image = TF.adjust_hue(image, hue_factor=hue)
                 #not needed for segmentation
             
-            # 7. Sharpness
+            # 8. Sharpness
             if random.random() > 0.5:
                 sharpness = random.uniform(0.5, 2)
                 image = TF.adjust_sharpness(image, sharpness_factor=sharpness)
                 # not needed for segmentation
 
-            # 8. Equalize
+            # 9. Equalize
             if random.random() > 0.5:
                 image = TF.equalize(image)
                 # not needed for segementation
@@ -260,12 +266,38 @@ print(image.shape)
 # image = transforms.functional.adjust_sharpness(image, sharpness_factor=5)
 # image = transforms.functional.equalize(image)
 
-# image = transforms.functional.resized_crop(image, 0, 0, 200, 200, (400, 400))
+i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.3, 0.3), ratio=(0.75, 1.33))
+print(i, j, h, w)
+# image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
 # image = transforms.functional.center_crop(image, (224, 224))
+
+# image = TF.vflip(image)
 
 plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
 
 print(image)
+
+# %%
+import timeit
+since = time.time()
+%timeit -n 10000 -r 50 random.uniform(0.5, 1)
+print(time.time() - since)
+
+# %%
+since = time.time()
+%timeit -n 10000 -r 50 transforms.RandomRotation.get_params([0.5, 1])
+print(time.time() - since)
+# %%
+since = time.time()
+%timeit -n 10000 -r 50 torch.FloatTensor(0).uniform_(0.5, 1)
+print(time.time() - since)
+
+# %%
+
+
+# %%
+
+transforms.RandomResizedCrop.get_params(image, scale=(0.08, 1.0), ratio=(0.75, 1.3333))
 
 # %%
 
@@ -278,11 +310,14 @@ a
 
 # %%
 
-import random
-# random.seed(11)
-# a = random.randrange(3, 4)
-# b = random.uniform(2, 20)
 
+def f():
+    if random.random() > 0.5:
+        print("yes")
+    if random.random() < 0.5:
+        print("no")
+    else: print("\nno result")
+f()
 
 # %%
 # class FirstNet(nn.Module):
