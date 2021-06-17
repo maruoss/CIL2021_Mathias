@@ -11,6 +11,7 @@ from glob import glob
 
 import torch
 from torch import nn
+
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 
@@ -28,8 +29,8 @@ import random
 # Define random seeds
 random_seed = 343
 torch.manual_seed(17)
-# random.seed(1222) # also needed for transforms.RandomRotation.get_params...
-# np.random.seed(0) # global numpy RNG
+random.seed(1222) # also needed for transforms.RandomRotation.get_params...
+np.random.seed(0) # global numpy RNG
 
 # Define root to current working directory + "/Data"
 root = Path.cwd() / 'Data'
@@ -86,11 +87,10 @@ assert [y[-7:] for y in [str(x) for x in val_image_paths]] == [y[-7:] for y in [
 # %%
 # Create custom Dataset class to load one sample of tuple (image, groundtruth)
 class CustomDataset(torch.utils.data.Dataset):
-    def __init__(self, image_paths: list, groundtruth_paths: list, device: str, train=True, resize_to=(400, 400)): #RESIZE TO?
+    def __init__(self, image_paths: list, groundtruth_paths: list, train=True, resize_to=(400, 400)): #RESIZE TO?
         # Initialize imagepaths, grountruthpaths and transform
         self.image_paths = image_paths
         self.groundtruth_paths = groundtruth_paths
-        self.device = device # CPU or cuda?
         self.train = train # Train or validation mode?
         self.resize_to = resize_to
 
@@ -115,10 +115,10 @@ class CustomDataset(torch.utils.data.Dataset):
         # Training Augmentation
         if train:
             # 1. Random resize crop
-            # top = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
-            # left = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
-            # height = random.randint(200, img_size[1])
-            # width = random.randint(200, img_size[1])
+            # i = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
+            # j = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
+            # h = random.randint(200, img_size[1])
+            # w = random.randint(200, img_size[1])
             i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.3, 1.0), ratio=(0.75, 1.333))
             size = self.resize_to
             image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=size)
@@ -173,10 +173,10 @@ class CustomDataset(torch.utils.data.Dataset):
                 image = TF.adjust_sharpness(image, sharpness_factor=sharpness)
                 # not needed for segmentation
 
-            # 9. Equalize
-            if random.random() > 0.5:
-                image = TF.equalize(image)
-                # not needed for segementation
+            # # 9. Equalize
+            # if random.random() > 0.5:
+            #     image = TF.equalize(image)
+            #     # not needed for segementation
 
         # 3. ToTensor
         image = TF.to_tensor(image)
@@ -201,15 +201,15 @@ class CustomDataset(torch.utils.data.Dataset):
         else: # Validation phase
             im, gt = self._my_segmentation_transforms(im, gt, train=False)
 
-        # Finish transformation: ToTensor, normalize, attach to device
+        # Alternative Compose transformation: ToTensor, normalize, attach to device
         # Images
         # if self.transforms:
-        #     im = self.transforms(im).to(self.device)
+        #     im = self.transforms(im)
         # # Targets
         # if self.target_transforms:
-        #     gt = self.target_transforms(gt).to(self.device)
+        #     gt = self.target_transforms(gt)
 
-        return im.pin_memory().to(device=self.device, non_blocking=True), gt.pin_memory().to(device=self.device, non_blocking=True)
+        return im, gt
 
     def __len__(self):
         return len(self.image_paths)
@@ -218,15 +218,18 @@ class CustomDataset(torch.utils.data.Dataset):
 # %%
 
 # Define device "cuda" for GPU, or "cpu" for CPU
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# Define batch size for Dataloaders
+BATCH_SIZE = 8
 
 # Instantiate Datasets for train and validation
-train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, device, train=True) # train=True
-val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, device, train=False) # train=False
+train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True) # train=True
+val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False) # train=False
 
 # Instantiate Loaders for these datasets, # SET BATCH SIZE HERE
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=True) # BATCH SIZE
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=8, shuffle=True) # BATCH SIZE
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
 
 
 # %%
@@ -238,13 +241,28 @@ print(f"Labels batch shape: {train_labels.size()}")
 img = torch.moveaxis(train_features[0], 0, -1) #Select first image out of batch, reshape CHW to HWC (plt.imshow needs shape H, W, C)
 label = train_labels[0] # Select first label out of shape BHW
 # Show image, .cpu() otherwise imshow doesnt work with cuda
-plt.imshow(img.cpu())
+plt.imshow(img)
 plt.show()
 # Squeeze only if target_transform is provided -> transformed int into torch.float [0, 1] range, and added channel
 label = label.squeeze()
 # Show groundtruth in greyscale (original interpretation)
-plt.imshow(label.cpu(), cmap="gray") 
+plt.imshow(label, cmap="gray") 
 plt.show()
+
+# torch.unique(label)
+
+# %%
+
+
+
+#%%
+
+
+label = (label > 0.9).float()
+plt.imshow(label, cmap="gray") 
+plt.show()
+
+
 
 # %%
 
@@ -278,22 +296,22 @@ plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
 print(image)
 
 # %%
-import timeit
-since = time.time()
-%timeit -n 10000 -r 50 random.uniform(0.5, 1)
-print(time.time() - since)
+# import timeit
+# since = time.time()
+# %timeit -n 10000 -r 50 random.uniform(0.5, 1)
+# print(time.time() - since)
+
+# # %%
+# since = time.time()
+# %timeit -n 10000 -r 50 transforms.RandomRotation.get_params([0.5, 1])
+# print(time.time() - since)
+# # %%
+# since = time.time()
+# %timeit -n 10000 -r 50 torch.FloatTensor(0).uniform_(0.5, 1)
+# print(time.time() - since)
 
 # %%
-since = time.time()
-%timeit -n 10000 -r 50 transforms.RandomRotation.get_params([0.5, 1])
-print(time.time() - since)
-# %%
-since = time.time()
-%timeit -n 10000 -r 50 torch.FloatTensor(0).uniform_(0.5, 1)
-print(time.time() - since)
-
-# %%
-
+image.view(3, -1).shape
 
 # %%
 
@@ -309,7 +327,14 @@ a = TF._get_image_size(a)
 a
 
 # %%
+# BATCH_SIZE=3
+# def f():
+#     return (3 + batch_size)
 
+# f()
+
+
+# %%
 
 def f():
     if random.random() > 0.5:
@@ -343,12 +368,40 @@ torch.empty(3).random_(2)
 
 
 # %%
-# # Test output with Loss functions
-# print(train_features[0].shape) # We need shape [Batch, C, H, W] for model
-# logits = model(train_features[0].unsqueeze(0)) # unsqueeze first dim to get Batch=1, for 1 example
-# print(logits)
+# Test output with Loss functions
+print(train_features[0].shape) # We need shape [Batch, C, H, W] for model
+print(torch.stack([train_features[0], train_features[1]]).shape)
+logits = model(torch.stack([train_features[0], train_features[1]]).to(default_device)) # unsqueeze first dim to get Batch=1, for 1 example
+
+print(logits["out"].shape)
 # target = torch.tensor([1]).unsqueeze(0).to(device) # target class 0, shape [B, scalar]
 
+a = logits["out"].view(logits["out"].shape[0], -1)
+b = (logits["out"]+1.).view(logits["out"].shape[0], -1)
+
+a - b
+
+# %%
+assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
+predict = predict.contiguous().view(predict.shape[0], -1)
+target = target.contiguous().view(target.shape[0], -1)
+
+# %%
+
+a = torch.tensor(([1., 2, 3, 4], [5, 6, 7, 8]))
+b = torch.tensor([[1., 1., 1, 1], [0, 0, 0, 1]])
+print(a.shape)
+print(b.shape)
+c = torch.mul(a, b)
+print(c)
+d = 1 - (torch.sum(c, dim=1) + 1)
+print(d)
+d.mean()
+#%%
+print(a.pow(2))
+print(b.pow(2))
+print(a.pow(2) + b.pow(2))
+torch.sum(a.pow(2) + b.pow(2), dim=1)
 
 
 # %%
@@ -451,7 +504,11 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
         model.train()
         for (x, y) in pbar:
             optimizer.zero_grad()  # zero out gradients
-            y_hat = model(x)["out"]  # forward pass #MATHIAS: ADJUSTED "OUT"
+            x = x.to(default_device) # add to device here -> faster than in Dataset itself!
+            y = y.to(default_device)
+            y_hat = model(x)["out"]  # forward pass #MATHIAS: need ["out"] for deeplabv3
+            # # ADJUST: Round groundtruth to 0, 1? 
+            # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF
             loss = loss_fn(y_hat, y)
             loss.backward()  # backward pass
             optimizer.step()  # optimize weights
@@ -468,8 +525,12 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
         model.eval()
         with torch.no_grad():  # do not keep track of gradients
             for (x, y) in eval_dataloader:
+                x = x.to(default_device) # add to device here -> faster than in Dataset itself!
+                y = y.to(default_device)
                 # probability of pixel being 0 or 1:
                 y_hat = model(x)["out"] # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
+                # # ADJUST: Round groundtruth to 0, 1? 
+                # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF 
                 loss = loss_fn(y_hat, y)
                 
                 # log partial metrics
@@ -536,7 +597,7 @@ CUTOFF = 0.25
 
 # Instantiate model
 model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
-model.to(device) #add to gpu
+model.to(default_device) #add to gpu
 
 # Finetuning or Feature extraction? Freeze backbone of resnet101
 for x in model.backbone.parameters():
@@ -552,7 +613,7 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # %%
 # Train
 train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, n_epochs=30)
+             metric_fns=metric_fns, optimizer=optimizer, n_epochs=3)
 
 # %%
 
@@ -562,6 +623,14 @@ train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_
 # for k, v in dict1.items():
 #     print(k, v)
 
+
+# 50 Epochs
+# - loss = 0.2721095246573289
+#   	- val_loss = 0.24816518276929855
+#   	- acc = 0.8852976312239965
+#   	- val_acc = 0.9063620865345001
+#   	- patch_acc = 0.8582499871651331
+#   	- val_patch_acc = 0.8760999739170074
 
 
 # *****************************************************************************************************
