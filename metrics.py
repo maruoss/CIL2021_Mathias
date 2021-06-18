@@ -4,7 +4,7 @@ def accuracy_fn(y_hat, y):
     return (y_hat.round() == y.round()).float().mean()
 
 
-def patch_accuracy(y_hat, y, patch_size=16, cutoff=0.25):
+def patch_accuracy(y_hat, y, patch_size=16, cutoff=0.25): # DEFINE PATCH_SIZE AND CUTOFF
     # computes accuracy weighted by patches
     h_patches = y.shape[-2] // patch_size # Number of patches in the height
     w_patches = y.shape[-1] // patch_size

@@ -2,7 +2,7 @@ import time
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from trainer_callback import show_val_samples
+from trainer_visualizer import show_val_samples
 
 def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
     # training loop

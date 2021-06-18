@@ -306,7 +306,7 @@ for x in model.backbone.parameters():
     x.requires_grad = False
 
 # Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
 # loss_fn = nn.BCEWithLogitsLoss()
 # from diceloss import BinaryDiceLoss_Logits
@@ -338,7 +338,23 @@ a = "text1"
 print(a)
 assert str(a) in ("song", "text1"), "not text or song string"
 
+#%%
+
+import settings
+print(settings.current_settings)
+foo = settings.default_settings['foo']
+bar = settings.current_settings['bar']
+settings.current_settings['bar'] = True
+print(settings.current_settings)
+
 # %%
+
+default_settings = {'foo': True, 'bar': False}
+my_settings = {'foo': False}
+current_settings = default_settings.copy()
+current_settings.update(my_settings)
+print(default_settings)
+print(current_settings)
 
 
 #%%
@@ -461,4 +477,6 @@ a = np.array(([1, 2], [3, 4]))
 # %%
 
 b = torch.from_numpy(a)
+
+# %%
 
