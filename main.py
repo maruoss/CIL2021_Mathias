@@ -1,6 +1,7 @@
 # To add a new cell, type '# %%'
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
@@ -23,6 +24,7 @@ from diceloss import BinaryDiceLoss_Logits
 from model import createDeepLabHead
 from trainer import train_epoch
 from metrics import accuracy_fn, patch_accuracy
+from augmentation import test_transform_fn
 
 # %%
 # Define random seeds
@@ -32,23 +34,87 @@ torch.manual_seed(random_seed)
 random.seed(random_seed) # also needed for transforms.RandomRotation.get_params...
 np.random.seed(random_seed) # global numpy RNG
 
-# Define root to current working directory + "/Data"
+# Define root to current working directory + "/Data" -> LEONHARD: MAY HELP DETERM ROOT PATH
 root = Path.cwd() / 'Data'
 print("Your current working directory + '/ Data' path: \n" + str(root))
 
 
 # %%
 # Get path names in a list
-def get_filenames_of_path(path: Path, ext: str = '*'):
-    """Returns a list of files in a directory/path. Uses pathlib."""
-    filenames = [file for file in path.glob(ext) if file.is_file()]
+def get_filenames_of_path(path: Path, ext: str = '*') -> list:
+    """Returns a list of sorted? files in a directory/path. Uses pathlib."""
+    filenames = [file for file in path.glob(ext) if file.is_file()] # path.glob is windowspath, with extension "*" for all images in respective folder
     return filenames
 
 
 # %%
 # Apply function to get list of pathnames
 image_paths = get_filenames_of_path(root / "training" / "training" / "images")
+print("Train set first path: ", image_paths[0])
 groundtruth_paths = get_filenames_of_path(root / "training" / "training" / "groundtruth")
+print("Mask set first path: ", groundtruth_paths[0])
+
+# Test pictures
+test_image_paths = get_filenames_of_path(root / "test_images" / "test_images") # sorted already by pathlib somehow, see below
+print("Test set first path: ", test_image_paths[0])
+
+
+
+
+
+# %%
+# test_image_paths[0]
+
+# for i in sorted(test_image_paths):
+#     print(int(re.search(r"\d+", i.name).group(0)))
+
+# %%
+
+# with open("dummy_test_file.csv", "w") as f:
+#     f.write("id, prediction\n")
+#     for fn in sorted(test_image_paths):
+#         img_number = int(re.search(r"\d+", fn.name).group(0))
+#         print(img_number)
+
+# %%
+# a = [file for file in sorted(root.glob("test_images/test_images/*"))] # we see: pathlib sorts already somehow
+# b = [file for file in root.glob("test_images/test_images/*")]
+# assert a == b # pathlib.glob sorts already
+
+# %%
+# TUTORIAL WAY OF DOING IT (WITHOUT PATH)
+# test_path = 'Data/test_images/test_images'
+# test_filenames = sorted(glob(test_path + '/*.png'))
+
+# test_filenames
+# # %%
+# test_path = 'Data/training/training/images'
+# test_filenames = sorted(glob(test_path + '/*.png'))
+
+# test_filenames
+
+
+#%%
+
+# for f in root.glob("*"):
+
+#     print(f)
+
+# type(root)
+
+# len(sorted(root.glob("training/training/images/*")))
+
+# %%
+# a = [1, 2, 3]
+# b = {"one_key": ["one_value"], "two_key": ["two_value"], "three_key": ["three_value"], "four_key": ["four_value"]}
+
+# for c, d, e in zip(a, b.keys(), b.values()):
+#     print(c, d, e)
+
+
+# for k, v in b.items():
+#     print(k, v)
+
 
 # %%
 # # Image Transform function
@@ -292,7 +358,7 @@ torch.empty(3).random_(2)
 
 
 
-# %%
+# %% ######################################### TRAIN ############################################################
 # Define global variables
 PATCH_SIZE = 16
 CUTOFF = 0.25
@@ -320,7 +386,7 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # %%
 # Train
 train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=3)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=1)
 
 # %%
 
@@ -331,7 +397,139 @@ train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_
 #     print(k, v)
 
 
-# *****************************************************************************************************
+# ***************************************** PREDICTION ************************************************************
+# Test prediction
+# %% Taken from CIL Tutorial, https://colab.research.google.com/github/dalab/lecture_cil_public/blob/master/exercises/2021/Project_3.ipynb#scrollTo=cKQvTg8gE9JC
+# with slight adjustment as we use pathlib instead of glob.glob
+def create_submission(labels, test_filenames, submission_filename):
+    test_path='test_images/test_images'
+    with open(submission_filename, 'w') as f:
+        f.write('id,prediction\n')
+        for fn, patch_array in zip(sorted(test_filenames), labels):
+            img_number = int(re.search(r"\d+", fn.name).group(0)) # Adjusted: fn.name since here its a Path not a string, have to take string with .name
+            for i in range(patch_array.shape[0]):
+                for j in range(patch_array.shape[1]):
+                    f.write("{:03d}_{}_{},{}\n".format(img_number, j*PATCH_SIZE, i*PATCH_SIZE, int(patch_array[i, j])))
+
+# Function to show first and last test images and predicted masks
+def show_first_last_pred(pred_torch_list: list, image_list: list, first_last=5):
+    fig, axs = plt.subplots(first_last, 4, figsize=(10, 14))
+    for i in range(first_last):
+        # Image plot
+        axs[i, 0].imshow(image_list[i])
+        axs[i, 1].imshow(np.concatenate([np.moveaxis(pred_torch_list[i][0].detach().cpu().numpy(), 0, -1)] * 3, -1)) # Yields clipping warning, as deeplabv3 has input floats of <0 and >1
+        axs[i, 2].imshow(image_list[-(i+1)])
+        axs[i, 3].imshow(np.concatenate([np.moveaxis(pred_torch_list[-(i+1)][0].detach().cpu().numpy(), 0, -1)] * 3, -1)) # No warning now. yielded clipping warning -> because of no sigmoid func. in predictions!
+        axs[i, 0].set_title(f'First Image {i+1}')
+        axs[i, 1].set_title(f'First Pred {i+1}')
+        axs[i, 2].set_title(f'Last Image {i+1}')
+        axs[i, 3].set_title(f'Last Pred {i+1}')
+        axs[i, 0].set_axis_off()
+        axs[i, 1].set_axis_off()
+        axs[i, 2].set_axis_off()
+        axs[i, 3].set_axis_off()
+
+# %%
+# Open first test image to have a look at it, resizing
+a = Image.open(test_image_paths[0]).resize((400, 400))
+a #should be test img number 10. test_image_paths should be sorted from get_filenames_of_path function.
+
+#%%
+# Load PIL Images from path list to a list
+test_images = [Image.open(img) for img in sorted(test_image_paths)]
+orig_size = test_images[0].size #should be test img number 10 (first image when sorted)
+# size should be 608 (original test size)
+
+# Predict on test images
+test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W]
+model.eval() # eval mode
+with torch.no_grad():  # do not keep track of gradients
+    for x in tqdm(test_images):
+        x = test_transform_fn(x, resize_to=(400, 400)) # apply test transform first. Resize to same shape model was trained on.
+        x = torch.unsqueeze(x, 0) # unsqueeze first dim. for exp. batch dim
+        x = x.to(default_device)
+        # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
+        test_pred = torch.sigmoid(model(x)["out"]) # forward pass + sigmoid
+        test_pred_list.append(test_pred) # append to list
+
+# %%
+# Show first and last predicted test masks
+show_first_last_pred(test_pred_list, test_images, first_last=3)
+
+# %%
+#  Convert model outputs to mask labels
+test_pred = torch.cat(test_pred_list, 0) # concatenate to [94, 1, H, W]
+test_pred = TF.resize(test_pred.detach().cpu(), (608, 608)) # resize back to original size: [94, 1, 608, 608]
+# cpu is faster here
+# Use Numpy below, faster than torch here
+# Reshape to [94, 38, 16, 38, 16]:
+test_pred = test_pred.numpy().reshape(-1, orig_size[0] // PATCH_SIZE, PATCH_SIZE, orig_size[0] // PATCH_SIZE, PATCH_SIZE)
+assert (np.equal((test_pred.mean((-1, -3)) > CUTOFF), (np.moveaxis(test_pred, 2, 3).mean((-1, -2)) > CUTOFF))).all() #taking mean across -1, -3 is equal to moving axes and then taking mean...
+test_pred = test_pred.mean((-1, -3)) > CUTOFF # Take mean along batches, is it above CUTOFF?
+test_pred = test_pred.astype(float) #astype(float) converts Boolean to float32
+
+# %%
+# Create csv file for submission
+create_submission(test_pred, test_image_paths, "deeplabv3_firstsub.csv")
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% END %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# %% Numpy is faster ############################################################################
+# TORCH TEST -> 1.27s
+# def f():
+#     test_pred = torch.cat(test_pred_list, 0) # concatenate to [94, 1, H, W]
+#     test_pred = TF.resize(test_pred.detach().cpu(), (608, 608)) # resize back to original size: [94, 1, 608, 608]
+#     orig_size = (608, 608)
+#     test_pred = test_pred.reshape(-1, orig_size[0] // PATCH_SIZE, PATCH_SIZE, orig_size[0] // PATCH_SIZE, PATCH_SIZE)
+#     assert torch.equal((test_pred.mean((-1, -3)) > CUTOFF), (test_pred.moveaxis(2, 3).mean((-1, -2)) > CUTOFF))
+#     test_pred = test_pred.mean((-1, -3)) > CUTOFF
+#     test_pred = test_pred.float()
+#     create_submission(test_pred, test_image_paths, "test.csv")
+# %timeit -n 10 -r 1 f()
+# # %%
+# # NUMPY TEST -> 500ms
+# def g():
+#     test_pred = torch.cat(test_pred_list, 0) # concatenate to [94, 1, H, W]
+#     test_pred = TF.resize(test_pred.detach().cpu(), (608, 608)) # resize back to original size: [94, 1, 608, 608]
+#     orig_size = (608, 608)
+#     test_pred = test_pred.numpy().reshape(-1, orig_size[0] // PATCH_SIZE, PATCH_SIZE, orig_size[0] // PATCH_SIZE, PATCH_SIZE)
+#     # assert np.equal((test_pred.mean((-1, -3)) > CUTOFF), (test_pred.moveaxis(2, 3).mean((-1, -2)) > CUTOFF))
+#     test_pred = test_pred.mean((-1, -3)) > CUTOFF
+#     test_pred = np.round(test_pred).astype(float)
+#     create_submission(test_pred, test_image_paths, "test2.csv")
+# %timeit -n 10 -r 1 g()
+
+# %%
+# def f():
+#     # since = time.time()
+#     tens_conc = torch.cat(y_pred_list, 0)
+#     tens_conc.shape
+    # print(time.time()-since)
+# %%
+# %timeit -n 100 -r 10 f()
+# %%
+# Transform list of tensors to list of numpy arrays for faster matrix manipulation
+# numpy_list = [pred.detach().cpu().numpy() for pred in y_pred_list]
+
+# %%timeit
+# def g():
+#     # since = time.time()
+#     numpy_conc = np.concatenate(numpy_list, 0)
+#     numpy_conc.shape
+#     # print(time.time()-since)
+
+# %timeit -n 100 -r 10 g()
+
+
+# %%
+# TF.to_pil_image(y_pred_list[-1][0])
+
+# %%
+
+# np.concatenate([np.moveaxis(y_pred_list[1][0].detach().cpu().numpy(), 0, -1)] * 3, -1).shape
+
 # %%
 a = "text1"
 

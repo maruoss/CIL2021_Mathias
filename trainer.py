@@ -48,7 +48,7 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
             for (x, y) in eval_dataloader:
                 x = x.to(device) # add to device here -> faster than in Dataset itself!
                 y = y.to(device)
-                # probability of pixel being 0 or 1:
+                # logits of pixel being 0 or 1:
                 y_hat = model(x)["out"] # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
                 # # ADJUST: Round groundtruth to 0, 1? 
                 # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF 
