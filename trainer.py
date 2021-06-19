@@ -3,14 +3,19 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from trainer_visualizer import show_val_samples
+from torch.utils.tensorboard import SummaryWriter
+import copy
 
-def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
+def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
     # training loop
     # logdir = './tensorboard/net'
-    # writer = SummaryWriter(logdir)  # tensorboard writer (can also log images)
+    writer = SummaryWriter()  # tensorboard writer (can also log images)
     since = time.time()
 
     history = {}  # collects metrics at the end of each epoch
+    best_val_loss = 1e10 # Initialize best val loss
+    best_model_wts = copy.deepcopy(model.state_dict()) # Initialize best model weights
+    best_epoch = 1 # Initialize at which epoch best model is saved
 
     for epoch in range(n_epochs):  # loop over the dataset multiple times
 
@@ -61,17 +66,28 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
                 for k, fn in metric_fns.items():
                     metrics['val_'+k].append(fn(y_hat, y).item())
 
+
         # summarize metrics, log to tensorboard and display
         history[epoch] = {k: sum(v) / len(v) for k, v in metrics.items()}
-        # for k, v in history[epoch].items():
-        #   writer.add_scalar(k, v, epoch)
-        print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()]))
-        show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy())
+        for k, v in history[epoch].items():
+          writer.add_scalar(k, v, epoch) # log to tensorboard
+        writer.close() #close writer
+        print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()])) # print epoch losses/ metrics
+        show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy()) # show val samples and predicted masks
+
+        # Save model weights if best val loss in epoch:
+        if history[epoch]["val_loss"] < best_val_loss:
+            best_val_loss = history[epoch]["val_loss"]
+            best_model_wts = copy.deepcopy(model.state_dict()) # deepcopy otherwise its just referenced and saves overfitted model instead, recommended on PyTorch website.
+            best_epoch = epoch+1 # epoch starts at 0
+
 
     print('Finished Training')
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
+    print('Best validation loss: {:.4f} after {} epochs'.format(best_val_loss, best_epoch))
+    print(f"Best model returned after {best_epoch} epochs")
 
     # Show plot for losses
     plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
@@ -89,3 +105,7 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
     #     plt.xlabel('Epochs')
     #     plt.legend()
     #     plt.show()
+
+    # load best model weights (lowest val loss in epochs)
+    model.load_state_dict(best_model_wts)
+    return model

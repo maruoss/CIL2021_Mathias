@@ -30,7 +30,7 @@ def transform_fn(image: PIL or torch.tensor, segmentation: PIL or torch.tensor, 
             # j = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
             # h = random.randint(200, img_size[1])
             # w = random.randint(200, img_size[1])
-            i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.3, 1.0), ratio=(0.75, 1.333))
+            i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.7, 1.0), ratio=(1., 1.))
             size = resize_to
             image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=size)
             segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=size)
@@ -52,35 +52,35 @@ def transform_fn(image: PIL or torch.tensor, segmentation: PIL or torch.tensor, 
                 segmentation = TF.vflip(segmentation)
 
             # 5. Random Grayscale
-            if random.random() > 0.5:
-                image = TF.rgb_to_grayscale(image, num_output_channels=3)
-                # not needed for segmentation mask        
+            # if random.random() > 0.5:
+            #     image = TF.rgb_to_grayscale(image, num_output_channels=3)
+            #     # not needed for segmentation mask        
 
             # 6. Gaussian Blur
-            if random.random() > 0.5:
-                sigma = random.uniform(0.1, 2.)
-                kernel_size = random.randrange(3, 50, 2)
-                image = TF.gaussian_blur(image, kernel_size=kernel_size, sigma=sigma)
+            # if random.random() > 0.5:
+            #     sigma = random.uniform(0.1, 0.5)
+            #     kernel_size = random.randrange(3, 10, 2)
+            #     image = TF.gaussian_blur(image, kernel_size=kernel_size, sigma=sigma)
                 # not needed for segmentation mask
 
             # 7. ColorJitter: Adjust brightness, contrast, saturation, hue
             if random.random() > 0.5:
-                brightness = random.uniform(0.5, 2)
+                brightness = random.uniform(0.8, 1.2)
                 image = TF.adjust_brightness(image, brightness_factor=brightness)
 
-                contrast = random.uniform(0.5, 2)
+                contrast = random.uniform(0.8, 1.2)
                 image = TF.adjust_contrast(image, contrast_factor=contrast)
 
-                saturation = random.uniform(0.5, 2)
+                saturation = random.uniform(0.8, 1.2)
                 image = TF.adjust_saturation(image, saturation_factor=saturation)
 
-                hue = random.uniform(-0.3, 0.3)
-                image = TF.adjust_hue(image, hue_factor=hue)
+                # hue = random.uniform(0)
+                # image = TF.adjust_hue(image, hue_factor=hue)
                 #not needed for segmentation
             
             # 8. Sharpness
             if random.random() > 0.5:
-                sharpness = random.uniform(0.5, 2)
+                sharpness = random.uniform(0.8, 2)
                 image = TF.adjust_sharpness(image, sharpness_factor=sharpness)
                 # not needed for segmentation
 

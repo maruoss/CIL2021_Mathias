@@ -8,6 +8,7 @@ from glob import glob
 from PIL import Image
 from pathlib import Path
 import time
+from torch.utils import tensorboard
 from tqdm import tqdm
 import random
 from sklearn.model_selection import train_test_split
@@ -22,7 +23,7 @@ import torchvision.transforms.functional as TF
 from dataset import CustomDataset
 from diceloss import BinaryDiceLoss_Logits
 from model import createDeepLabHead
-from trainer import train_epoch
+from trainer import train_model
 from metrics import accuracy_fn, patch_accuracy
 from augmentation import test_transform_fn
 
@@ -156,9 +157,12 @@ default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Define batch size for Dataloaders
 BATCH_SIZE = 8 # cannot be
 
+# Set picture size on which model will be trained
+resize_to = (400, 400)
+
 # Instantiate Datasets for train and validation
-train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True) # train=True
-val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False) # train=False
+train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True, resize_to=resize_to) # train=True
+val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False, resize_to=resize_to) # train=False
 
 # Instantiate Loaders for these datasets, # SET BATCH SIZE HERE
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
@@ -196,7 +200,7 @@ plt.show()
 # %%
 
 # Test for image transformations:
-image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[0])), -1, 0))
+image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0))
 # label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
 
 print(image.shape)
@@ -206,24 +210,32 @@ print(image.shape)
 # transform = transforms.Compose([transforms.RandomRotation(90)])
 # image = transform(image)
 
-# image = transforms.functional.adjust_brightness(image, brightness_factor=3.)
-# image = transforms.functional.adjust_contrast(image, contrast_factor=3)
-# image = transforms.functional.adjust_hue(image, hue_factor=0.5)
-# image = transforms.functional.adjust_saturation(image, saturation_factor=3)
-# image = transforms.functional.adjust_sharpness(image, sharpness_factor=5)
+# image = TF.rgb_to_grayscale(image, num_output_channels=3)
+# image = TF.gaussian_blur(image, kernel_size=9, sigma=0.5)
+# image = transforms.functional.adjust_brightness(image, brightness_factor=1.4)
+# image = transforms.functional.adjust_contrast(image, contrast_factor=1.2)
+# image = transforms.functional.adjust_hue(image, hue_factor=0.1)
+# image = transforms.functional.adjust_saturation(image, saturation_factor=0.8)
+# image = transforms.functional.adjust_sharpness(image, sharpness_factor=0.8)
 # image = transforms.functional.equalize(image)
 
-# i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.3, 0.3), ratio=(0.75, 1.33))
-# print(i, j, h, w)
-# image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
+
+i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.6, 0.6), ratio=(1, 1))
+
+image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
+
+
+
 # image = transforms.functional.resize(image, (224, 224))
 # image = transforms.functional.center_crop(image, (224, 224))
 
 # image = TF.vflip(image)
 
 plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+plt.show()
 
-print(image)
+
+# print(image.shape)
 
 # %%
 # import timeit
@@ -385,15 +397,45 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
 # Train
-train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+# model =, since train_model returns model with best val_loss, not from all epochs
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=1)
 
 # %%
+# %load_ext tensorboard
+# %%
+# !rm -rf ./tensorboard
+# %tensorboard --logdir=runs
 
-# dict1 = {"test": 1, "train": 2}
+# %%
 
-# # %%
-# for k, v in dict1.items():
+# torch.save(model.state_dict(), "statetest.pt")
+# import torch
+# dict1 = torch.load("statetest.pt")
+# model.load_state_dict(dict1)
+# # Check if model is on cuda
+# next(model.parameters()).device
+
+# %% 19.06.2021
+# after 30 epochs, lr: 0.001
+	# - loss = 0.6113083710273107
+  	# - val_loss = 0.6043204963207245
+  	# - acc = 0.9037549942731857
+  	# - val_acc = 0.8867132663726807
+  	# - patch_acc = 0.8867499828338623
+  	# - val_patch_acc = 0.8562999665737152
+
+# %%
+
+# nest_dict = {1: {"train": 0.9, "val": 0.8}, 2: {"train": 0.7, "val": 0.6}}
+
+
+# %%
+
+# nest_dict[1]["val"]
+
+# %%
+# for k, v in nest_dict.items():
 #     print(k, v)
 
 
@@ -453,7 +495,7 @@ with torch.no_grad():  # do not keep track of gradients
         test_pred_list.append(test_pred) # append to list
 
 # %%
-# Show first and last predicted test masks
+# Show first and last predicted test masks and test images
 show_first_last_pred(test_pred_list, test_images, first_last=3)
 
 # %%

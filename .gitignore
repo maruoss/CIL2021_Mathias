@@ -1,3 +1,4 @@
 /Data
 .vscode
 *.pyc
+/runs
