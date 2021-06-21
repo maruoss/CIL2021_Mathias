@@ -423,14 +423,14 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # Train
 # model =, since train_model returns model with best val_loss, not from all epochs
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=50)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=2)
 
 # %%
-# %load_ext tensorboard
+%load_ext tensorboard
 # %%
 # !rm -rf ./tensorboard
 # %tensorboard --logdir=runs
-# %tensorboard --logdir=runs --host localhost --port 6006
+%tensorboard --logdir=runs --host localhost --port 8008
 
 # %%
 

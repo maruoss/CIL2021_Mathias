@@ -8,7 +8,7 @@ import copy
 
 def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
     # training loop
-    # logdir = './tensorboard/net'
+    # logdir = 'tensorboard/100dice.lr0.001.batch8.img224.ep50'
     writer = SummaryWriter()  # tensorboard writer (can also log images)
     since = time.time()
 
@@ -85,8 +85,8 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
 
     print('Finished Training')
     time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print(f"Total Epochs run: {n_epochs}")
     print('Best validation loss: {:.4f} after {} epochs'.format(best_val_loss, best_epoch))
     print(f"Model returned after {best_epoch} epochs")
 
