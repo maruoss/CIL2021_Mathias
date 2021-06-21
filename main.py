@@ -429,8 +429,10 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 %load_ext tensorboard
 # %%
 # !rm -rf ./tensorboard
-# %tensorboard --logdir=runs
-%tensorboard --logdir=runs --host localhost --port 8008
+%tensorboard --logdir tensorboard
+
+# To launch tensorboard successfully: Open terminal. Enter: "tensorboard --logdir tensorboard" or "tensorboard --logdir=tensorboard" (both work)  -> should open on localhost
+# %tensorboard --logdir=runs --host localhost --port 6006
 
 # %%
 

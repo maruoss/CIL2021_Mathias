@@ -8,8 +8,8 @@ import copy
 
 def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
     # training loop
-    # logdir = 'tensorboard/100dice.lr0.001.batch8.img224.ep50'
-    writer = SummaryWriter()  # tensorboard writer (can also log images)
+    logdir = 'tensorboard/100dice.lr0.001.batch8.img224.ep50'
+    writer = SummaryWriter(logdir)  # tensorboard writer (can also log images)
     since = time.time()
 
     history = {}  # collects metrics at the end of each epoch
