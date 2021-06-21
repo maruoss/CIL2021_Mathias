@@ -73,7 +73,8 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
           writer.add_scalar(k, v, epoch) # log to tensorboard
         writer.close() #close writer
         print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()])) # print epoch losses/ metrics
-        show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy()) # show val samples and predicted masks
+        # Caution: Below function causes Memory Leakage if run on a lot of epochs!:
+        # show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy()) # show val samples and predicted masks
 
         # Save model weights if best val loss in epoch:
         if history[epoch]["val_loss"] < best_val_loss:
@@ -87,7 +88,7 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     print('Best validation loss: {:.4f} after {} epochs'.format(best_val_loss, best_epoch))
-    print(f"Best model returned after {best_epoch} epochs")
+    print(f"Model returned after {best_epoch} epochs")
 
     # Show plot for losses
     plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')

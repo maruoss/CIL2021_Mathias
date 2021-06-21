@@ -1,18 +1,25 @@
 # libraries
+import numpy as np
 import torch
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 import random
 import PIL
 
-def transform_fn(image: PIL or torch.tensor, segmentation: PIL or torch.tensor, train=True, resize_to=(400, 400)):
+def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or torch.tensor, train=True, resize_to=(400, 400)):
         """preprocessing for image, segmentation in training:
-        -> Input: PIL or tensor, Output: PIL or tensor"""
+        -> Input: PIL or tensor or np.array, Output: PIL or tensor"""
+
+        # 0. Convert numpy to PIL (transforms only work on PIl or tensors)
+        if isinstance(image, np.ndarray):
+            image = TF.to_pil_image(image)  
+            segmentation = TF.to_pil_image(segmentation)
 
         img_size = TF._get_image_size(image) # Get Size of Input Image
         
         # Validation Augmentation
         if not train:
+
             # 1. Resizing
             size = resize_to # Adjust
             image = TF.resize(image, size)
@@ -103,7 +110,7 @@ def transform_fn(image: PIL or torch.tensor, segmentation: PIL or torch.tensor, 
 
 
 def test_transform_fn(image: PIL or torch.tensor, resize_to=(400, 400)):
-        """preprocessing for image, segmentation in training:
+        """preprocessing for image in test:
         -> Input: PIL or tensor, Output: PIL or tensor"""
 
         img_size = TF._get_image_size(image) # Get Size of Input Image (Tuple)

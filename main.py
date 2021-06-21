@@ -60,8 +60,16 @@ test_image_paths = get_filenames_of_path(root / "test_images" / "test_images") #
 print("Test set first path: ", test_image_paths[0])
 
 
+# %%
+# import torch
+# torch.tensor(3) + torch.tensor(3)
 
+# # %%
+# import numpy as np
+# a = np.array([1, 2, 3])
 
+# if isinstance(a, np.ndarray):
+#     print("yes")
 
 # %%
 # test_image_paths[0]
@@ -155,18 +163,39 @@ assert [y[-7:] for y in [str(x) for x in val_image_paths]] == [y[-7:] for y in [
 default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Define batch size for Dataloaders
-BATCH_SIZE = 8 # cannot be
+BATCH_SIZE = 8 # not too large, causing memory issues!
 
 # Set picture size on which model will be trained
-resize_to = (400, 400)
+resize_to = (224, 224)
 
-# Instantiate Datasets for train and validation
-train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True, resize_to=resize_to) # train=True
-val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False, resize_to=resize_to) # train=False
+# ***************************************************************************
+# 3 Options how to load in images:
+# 1a) Load from paths, LARGE SCALE: best if goal is to scale to a lot of images, dont have to load all images at once)
 
-# Instantiate Loaders for these datasets, # SET BATCH SIZE HERE
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
+# # 1b) Load images as PIL images, in a numpy array (gives PIL image loading warning, rather use 1c))
+# train_images = np.array([Image.open(img) for img in sorted(train_image_paths)])
+# train_groundtruths = np.array([Image.open(img) for img in sorted(train_groundtruth_paths)])
+# val_images = np.array([Image.open(img) for img in sorted(val_image_paths)])
+# val_groundtruths = np.array([Image.open(img) for img in sorted(val_groundtruth_paths)])
+
+# # 1c) Load images as np.array, in a numpy array # SMALL SCALE: reload seems to be faster at training. better for small set of images.
+train_images = np.stack([np.array(Image.open(img)) for img in sorted(train_image_paths)]) # no astype(float32)/255., as otherwise transform wouldnt work (needs PIL images, and TF.to_pil_image needs it in this format)
+train_groundtruths = np.stack([np.array(Image.open(img)) for img in sorted(train_groundtruth_paths)])
+val_images = np.stack([np.array(Image.open(img)) for img in sorted(val_image_paths)])
+val_groundtruths = np.stack([np.array(Image.open(img)) for img in sorted(val_groundtruth_paths)])
+
+# # For 1b), 1c): Instantiate Datasets for train and validation IMAGES
+train_dataset = CustomDataset(train_images, train_groundtruths, train=True, resize_to=resize_to) # train=True
+val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to=resize_to) # train=False
+
+# # For 1a): Instantiate Datasets for train and validation PATHS
+# train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True, resize_to=resize_to) # train=True
+# val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False, resize_to=resize_to) # train=False
+
+# %% ***************************************************************************
+# Instantiate Loaders for these datasets
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 
 
 # %%
@@ -191,48 +220,44 @@ plt.show()
 
 #%%
 
-
 label = (label > 0.9).float()
 plt.imshow(label, cmap="gray") 
 plt.show()
 
-
 # %%
 
 # Test for image transformations:
-image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0))
-# label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
+# image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0))
+# # label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
 
-print(image.shape)
+# print(image.shape)
 
-# print(label.shape)
+# # print(label.shape)
 
-# transform = transforms.Compose([transforms.RandomRotation(90)])
-# image = transform(image)
+# # transform = transforms.Compose([transforms.RandomRotation(90)])
+# # image = transform(image)
 
 # image = TF.rgb_to_grayscale(image, num_output_channels=3)
-# image = TF.gaussian_blur(image, kernel_size=9, sigma=0.5)
-# image = transforms.functional.adjust_brightness(image, brightness_factor=1.4)
-# image = transforms.functional.adjust_contrast(image, contrast_factor=1.2)
-# image = transforms.functional.adjust_hue(image, hue_factor=0.1)
-# image = transforms.functional.adjust_saturation(image, saturation_factor=0.8)
-# image = transforms.functional.adjust_sharpness(image, sharpness_factor=0.8)
-# image = transforms.functional.equalize(image)
+# # image = TF.gaussian_blur(image, kernel_size=9, sigma=0.5)
+# # image = transforms.functional.adjust_brightness(image, brightness_factor=1.4)
+# # image = transforms.functional.adjust_contrast(image, contrast_factor=1.2)
+# # image = transforms.functional.adjust_hue(image, hue_factor=0.1)
+# # image = transforms.functional.adjust_saturation(image, saturation_factor=0.8)
+# # image = transforms.functional.adjust_sharpness(image, sharpness_factor=0.8)
+# # image = transforms.functional.equalize(image)
 
 
-i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.6, 0.6), ratio=(1, 1))
+# # i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.6, 0.6), ratio=(1, 1))
 
-image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
+# # image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
 
+# # image = transforms.functional.resize(image, (224, 224))
+# # image = transforms.functional.center_crop(image, (224, 224))
 
+# # image = TF.vflip(image)
 
-# image = transforms.functional.resize(image, (224, 224))
-# image = transforms.functional.center_crop(image, (224, 224))
-
-# image = TF.vflip(image)
-
-plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
-plt.show()
+# plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+# plt.show()
 
 
 # print(image.shape)
@@ -369,7 +394,6 @@ torch.empty(3).random_(2)
 
 
 
-
 # %% ######################################### TRAIN ############################################################
 # Define global variables
 PATCH_SIZE = 16
@@ -399,13 +423,14 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # Train
 # model =, since train_model returns model with best val_loss, not from all epochs
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=1)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=50)
 
 # %%
 # %load_ext tensorboard
 # %%
 # !rm -rf ./tensorboard
 # %tensorboard --logdir=runs
+# %tensorboard --logdir=runs --host localhost --port 6006
 
 # %%
 
@@ -429,6 +454,12 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 
 # nest_dict = {1: {"train": 0.9, "val": 0.8}, 2: {"train": 0.7, "val": 0.6}}
 
+# %%
+# import numpy as np
+# a = [1, 2, 3]
+# b = np.array(a)
+
+# b[1]
 
 # %%
 
@@ -487,7 +518,7 @@ test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W
 model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
-        x = test_transform_fn(x, resize_to=(400, 400)) # apply test transform first. Resize to same shape model was trained on.
+        x = test_transform_fn(x, resize_to=(resize_to)) # apply test transform first. Resize to same shape model was trained on.
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for exp. batch dim
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
