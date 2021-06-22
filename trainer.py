@@ -8,8 +8,8 @@ import copy
 
 def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
     # training loop
-    logdir = 'tensorboard/100dice.lr0.001.batch8.img224.ep50'
-    writer = SummaryWriter(logdir)  # tensorboard writer (can also log images)
+    # logdir = 'tensorboard/100dice.lr0.001.batch8.img400.ep50'
+    writer = SummaryWriter()  # tensorboard writer (can also log images)
     since = time.time()
 
     history = {}  # collects metrics at the end of each epoch
@@ -47,6 +47,10 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
                 metrics[k].append(fn(y_hat, y).item()) # TORCH SIGMOID HERE AS WELL -> LIKE A PREDICTION
             pbar.set_postfix({k: sum(v)/len(v) for k, v in metrics.items() if len(v) > 0})
 
+            # Add transformed train image to tensorboard
+            # x0 = x[0].detach()
+            # writer.add_image("train_image_transformed", x0, epoch)
+
         # validation
         model.eval()
         with torch.no_grad():  # do not keep track of gradients
@@ -71,9 +75,9 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
         history[epoch] = {k: sum(v) / len(v) for k, v in metrics.items()}
         for k, v in history[epoch].items():
           writer.add_scalar(k, v, epoch) # log to tensorboard
-        writer.close() #close writer
+        # writer.close() #close writer
         print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()])) # print epoch losses/ metrics
-        # Caution: Below function causes Memory Leakage if run on a lot of epochs!:
+        # CAUTION: Below function causes Memory Leakage if run on a lot of epochs! (not solved yet):
         # show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy()) # show val samples and predicted masks
 
         # Save model weights if best val loss in epoch:
@@ -81,6 +85,22 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
             best_val_loss = history[epoch]["val_loss"]
             best_model_wts = copy.deepcopy(model.state_dict()) # deepcopy otherwise its just referenced and saves overfitted model instead, recommended on PyTorch website.
             best_epoch = epoch+1 # epoch starts at 0
+
+        # Add images to tensorboard, as eval dataloader is shuffled x will be different each instance
+        # x0, x1, y0, y1, y_hat0, y_hat1 = x[0], x[1], y[0], y[1], y_hat[0], y_hat[1]
+        # writer.add_image("val_image", x0, epoch)
+        # writer.add_image("val_groundtruth", y0, epoch)
+        # writer.add_image("predicted_mask", y_hat0, epoch)
+        to_visualize = 2
+        to_stack = []
+        for i in range(min(to_visualize, len(x))):
+            to_stack += [x[i].detach(), y[i].detach().repeat(3, 1, 1), y_hat[i].detach().repeat(3, 1, 1)] #detach, but still on GPU?
+        writer.add_images("val_image, val_groundtruth, prediction_mask", torch.stack(to_stack, dim=0), epoch)
+        # writer.add_images("val_image, val_groundtruth, prediction_mask", 
+        # torch.stack((x0, y0.repeat(3, 1, 1), y_hat0.repeat(3, 1, 1)), dim=0), epoch) # repeat y's with shape (1, H, W) along dim 0 -> (3, H, W)
+        writer.close()
+ 
+
 
 
     print('Finished Training')

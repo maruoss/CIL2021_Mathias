@@ -9,6 +9,7 @@ from PIL import Image
 from pathlib import Path
 import time
 from torch.utils import tensorboard
+import torchvision
 from tqdm import tqdm
 import random
 from sklearn.model_selection import train_test_split
@@ -156,7 +157,6 @@ train_image_paths, val_image_paths, train_groundtruth_paths, val_groundtruth_pat
 assert [y[-7:] for y in [str(x) for x in train_image_paths]] == [y[-7:] for y in [str(x) for x in train_groundtruth_paths]]
 assert [y[-7:] for y in [str(x) for x in val_image_paths]] == [y[-7:] for y in [str(x) for x in val_groundtruth_paths]]
 
-
 # %%
 
 # Define device "cuda" for GPU, or "cpu" for CPU
@@ -166,7 +166,7 @@ default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE = 8 # not too large, causing memory issues!
 
 # Set picture size on which model will be trained
-resize_to = (224, 224)
+resize_to = (400, 400)
 
 # ***************************************************************************
 # 3 Options how to load in images:
@@ -220,6 +220,27 @@ plt.show()
 
 #%%
 
+# train_features, train_labels = next(iter(train_dataloader))
+
+# # train_features.shape
+# grid = torchvision.utils.make_grid(train_features)
+# grid.shape
+
+# x0, y0 = train_features[0], train_labels[0]
+# x1.shape
+# y0.requires_grad
+
+# np.equal(y0.repeat([3, 1, 1]).numpy() , np.concatenate(([y0.numpy()] * 3), 0)).all()
+
+#  np.concatenate(([y0.numpy()] * 3), 0)
+
+# np.concatenate(([y0.numpy()] * 3), 0)
+# y0.unsqueeze(0).repeat((1, 3, 1, 1)).shape
+
+
+
+
+#%%
 label = (label > 0.9).float()
 plt.imshow(label, cmap="gray") 
 plt.show()
@@ -408,7 +429,7 @@ for x in model.backbone.parameters():
     x.requires_grad = False
 
 # Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.000001)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
 # loss_fn = nn.BCEWithLogitsLoss()
 # from diceloss import BinaryDiceLoss_Logits
@@ -420,16 +441,25 @@ loss_fn = BinaryDiceLoss_Logits()
 metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
+# Load model from saved model to finetune:
+# model.load_state_dict(torch.load("state_e100lr.0001batch8img400+fine.e30lr.00001b2img224+fine.e30lr.0001b2img224.pt"))
+# # Check if model is on cuda
+# next(model.parameters()).device
+
+# %%
 # Train
 # model =, since train_model returns model with best val_loss, not from all epochs
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=2)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=20)
+
+# %% Save model for tinetuning conv layers
+# torch.save(model.state_dict(), "state_e100lr.0001batch8img400+fine.e30lr.00001b2img224+fine.e30lr.0001b2img224+fine.e30lr.00001b8img400.pt")
 
 # %%
-%load_ext tensorboard
+# %load_ext tensorboard
 # %%
 # !rm -rf ./tensorboard
-%tensorboard --logdir tensorboard
+# %tensorboard --logdir tensorboard
 
 # To launch tensorboard successfully: Open terminal. Enter: "tensorboard --logdir tensorboard" or "tensorboard --logdir=tensorboard" (both work)  -> should open on localhost
 # %tensorboard --logdir=runs --host localhost --port 6006
@@ -443,14 +473,7 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 # # Check if model is on cuda
 # next(model.parameters()).device
 
-# %% 19.06.2021
-# after 30 epochs, lr: 0.001
-	# - loss = 0.6113083710273107
-  	# - val_loss = 0.6043204963207245
-  	# - acc = 0.9037549942731857
-  	# - val_acc = 0.8867132663726807
-  	# - patch_acc = 0.8867499828338623
-  	# - val_patch_acc = 0.8562999665737152
+
 
 # %%
 

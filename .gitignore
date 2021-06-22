@@ -2,3 +2,5 @@
 .vscode
 *.pyc
 /tensorboard
+/runs
+*.pt
