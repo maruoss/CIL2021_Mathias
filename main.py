@@ -169,7 +169,7 @@ default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE = 8 # not too large, causing memory issues!
 
 # Set picture size on which model will be trained
-resize_to = (400, 400)
+resize_to = (224, 224)
 
 # ***************************************************************************
 # 3 Options how to load in images:
@@ -219,19 +219,51 @@ plt.imshow(label, cmap="gray")
 plt.show()
 
 # torch.unique(label)
+# %%
+# Count class imbalance
+# Percent pixel of images
+Threshold = 0.25
+perc_pixel_train = (train_groundtruths / 255. > Threshold).sum() / np.ones(train_groundtruths.shape).sum()
+print(f"{perc_pixel_train*100:.2f}% of train images consist of roads")
 
+# Positive class weight
+road_weight = (train_groundtruths/255. <= Threshold).sum() / (train_groundtruths/255. > Threshold).sum()
+print(f'Road weight: Sum Train Pixel Background/ Sum Train Pixel Road = {road_weight:.2f}')
+
+# perc_pixel_train = (val_groundtruths / 255. > Threshold).sum() / np.ones(val_groundtruths.shape).sum()
+# print(f"{perc_pixel_train*100:.2f}% of val images consist of roads")
+
+# perc_pixel_train = ((train_groundtruths / 255. > Threshold).sum() + (val_groundtruths / 255. > 0.25).sum()) / (np.ones(train_groundtruths.shape).sum() + np.ones(val_groundtruths.shape).sum())
+# print(f"{perc_pixel_train*100:.2f}% of all images consist of roads")
+
+# (val_groundtruths / 255. > 0.).sum() / np.ones(val_groundtruths.shape).sum()
+
+
+# (train_groundtruths[0] /255.  > 0.25).sum()
+# 400*400
+# np.unique(train_groundtruths[0] / 255.)
+# np.ones(train_groundtruths.shape).sum()
+# np.ones(train_groundtruths.shape).shape
+# np.ones(train_groundtruths.shape).sum()
+# train_groundtruths / 255.
 
 #%%
 
 # model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
 # model.to(default_device) #add to gpu
-model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True)
+# model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True)
 # %%
+
+
 
 # for i in model.backbone:
 #     print(i)
 
-model.backbone
+# for x in model.backbone.layer4.parameters():
+#     x.requires_grad = False
+
+# for x in model.backbone.parameters():
+#     print(x.requires_grad)
 
 #%%
 
@@ -241,8 +273,8 @@ model.backbone
 # %%
 
 # Finetuning or Feature extraction? Freeze backbone of resnet101
-for x in model.backbone.parameters():
-    x.requires_grad = False
+# for x in model.backbone.parameters():
+#     x.requires_grad = False
 
 # %%
 
@@ -250,11 +282,11 @@ train_features, train_labels = next(iter(train_dataloader))
 
 # %%
 
-patcher = nn.AvgPool2d(16)
-mask = patcher(train_labels)
+# patcher = nn.AvgPool2d(16)
+# mask = patcher(train_labels)
 
-mask[:, 0][mask[:, 0] > 0.25] = 1
-mask
+# mask[:, 0][mask[:, 0] > 0.25] = 1
+# mask
 
 
 # # train_features.shape
@@ -420,12 +452,29 @@ torch.empty(3).random_(2)
 
 
 # %%
-# Predict one instance, without learning anything
+# # Train one batch, without learning anything
 # model = createDeepLabHead()
-# model.to(device)
-# model.eval()
-# img = train_features[0] # Take first image from DataLoader
-# img = img.unsqueeze(0) # Unsqueeze for batch size = 1 -> [1, C, H, W]
+# model.to(default_device)
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400.pt"))
+# # Finetuning or Feature extraction? Freeze backbone of resnet101
+# for x in model.backbone.parameters():
+#     x.requires_grad = False
+# # model.eval()
+# img = train_features.to(default_device) # Take first image from DataLoader
+# a = model(img)["aux"]
+# b = model(img)["out"]
+# # %%
+# plt.imshow(torch.sigmoid(a[0][0]).detach().cpu().numpy(), cmap="gray")
+# plt.show()
+# plt.imshow(torch.sigmoid(b[0][0]).detach().cpu().numpy(), cmap="gray")
+# plt.show()
+
+# %%
+
+# (nn.functional.avg_pool2d(torch.sigmoid(b), 16) < 0.25).sum()
+
+
+# %%
 # print(img.shape)
 # with torch.no_grad():
 #     out = model(img)["out"].cpu()
@@ -449,7 +498,6 @@ torch.empty(3).random_(2)
 # plt.imshow(transforms.ToPILImage()(torch.cat([torch.moveaxis(out, 0, -1)]*3, 0).squeeze()))
 
 
-
 # %% ######################################### TRAIN ############################################################
 # Define global variables
 PATCH_SIZE = 16
@@ -463,13 +511,18 @@ model.to(default_device) #add to gpu
 for x in model.backbone.parameters():
     x.requires_grad = False
 
+# Set some layers of the backbone to learnable
+# for x in model.backbone.layer4.parameters():
+#     x.requires_grad = True
+
 # Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+LEARNING_RATE = 0.001
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
-# loss_fn = BCEWithLogitsLoss()
+# loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(2))
 # loss_fn = BinaryDiceLoss_Logits()
-loss_fn = BCEDiceLoss_Logits(weight_dice=0.8) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
-print(str(loss_fn))
+loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
+# print(str(loss_fn))
 
 # patch_accuracy = patch_accuracy(y_hat, y, patch_size=16, cutoff=0.5)
 
@@ -477,19 +530,23 @@ print(str(loss_fn))
 metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
-# Load model from saved model to finetune:
-# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400.pt"))
+# # Load model from saved model to finetune:
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400_auxloss+patchloss.pt"))
 # # Check if model is on cuda
 # next(model.parameters()).device
 
+# str(BCEDiceLoss_Logits(weight_dice=0.8))[:7]
+
 # %%
+name_loss = str(loss_fn)[:7]
+hyperparam_string = f"loss{name_loss}lr{LEARNING_RATE}batch{BATCH_SIZE}imgsize{resize_to[0]}"
 # Train
-# model =, since train_model returns model with best val_loss, not from all epochs
+# model =, since train_model returns model with best val_loss: "early stopped model"
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=hyperparam_string)
 
 # %% Save model for tinetuning conv layers
-# torch.save(model.state_dict(), "state_bcedice0.8e100lr.0001batch8img400.pt")
+# torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch8img400_auxloss+patchloss.pt")
 
 # %%
 # %load_ext tensorboard

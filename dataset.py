@@ -16,7 +16,7 @@ class CustomDataset(torch.utils.data.Dataset):
         # Numpy not necessary, gives errors on transforms. ToTensor transforms at the end transforms to tensor anyway.
         # im = Image.open(self.image_paths[idx]) # used when paths are provided instead of images, slower for small scale in training
         # gt = Image.open(self.groundtruth_paths[idx]) # used when paths are provided instead of images, slower for small scale in training
-        im = self.image_paths[idx]
+        im = self.image_paths[idx] #faster for small scale, use above to scale to lot of images
         gt = self.groundtruth_paths[idx]
 
         # Apply augmentation function to images and label

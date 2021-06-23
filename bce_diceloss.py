@@ -8,7 +8,7 @@ class BCEDiceLoss_Logits(nn.Module):
     Args:
         smooth: A float number to smooth loss, and avoid NaN error, default: 1
         p: Denominator value: \sum{x^p} + \sum{y^p}, default: 2
-        predict: A tensor of shape [N, *]
+        predict: A tensor of shape [N, *] of logits
         target: A tensor of shape same with predict
         reduction: Reduction method to apply, return mean over batch if 'mean',
             return sum if 'sum', return a tensor of shape [N,] if 'none'
@@ -23,7 +23,7 @@ class BCEDiceLoss_Logits(nn.Module):
         self.p = p
         self.reduction = reduction
         self.bcelogit = nn.BCEWithLogitsLoss() #ADDED BCEWITHLOGITLOSS
-        self.weight = weight_dice # Weight of DiceLoss (1- Weight: BCELoss)
+        self.weight = weight_dice # Weight of DiceLoss (1 - Weight: BCELoss)
 
     def forward(self, predict, target):
         assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
