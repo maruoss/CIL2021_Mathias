@@ -1,11 +1,9 @@
-# BinaryDiceLoss taken from https://github.com/hubutui/DiceLoss-PyTorch/blob/master/loss.py, 17.06.2021
-
 # necessary to import necessary packages, module has own private namespace (like a local function)
 import torch
 from torch import nn
 
 
-class BinaryDiceLoss_Logits(nn.Module):
+class BCEDiceLoss_Logits(nn.Module):
     """Dice loss of binary class
     Args:
         smooth: A float number to smooth loss, and avoid NaN error, default: 1
@@ -19,14 +17,20 @@ class BinaryDiceLoss_Logits(nn.Module):
     Raise:
         Exception if unexpected reduction
     """
-    def __init__(self, smooth=1, p=2, reduction='mean'):
+    def __init__(self, smooth=1, p=2, reduction='mean', weight_dice=0.5):
         super().__init__() # changed to super()....
         self.smooth = smooth
         self.p = p
         self.reduction = reduction
+        self.bcelogit = nn.BCEWithLogitsLoss() #ADDED BCEWITHLOGITLOSS
+        self.weight = weight_dice # Weight of DiceLoss (1- Weight: BCELoss)
 
     def forward(self, predict, target):
         assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
+        # BCE Loss first
+        bceloss = self.bcelogit(predict, target)
+
+        # Diceloss: convert logits to probabilities
         predict = torch.sigmoid(predict) # ADDED TORCH SIGMOID ACCOUNTING FOR LOGITS INPUT OF MODEL
         predict = predict.contiguous().view(predict.shape[0], -1)
         target = target.contiguous().view(target.shape[0], -1)
@@ -34,13 +38,13 @@ class BinaryDiceLoss_Logits(nn.Module):
         num = torch.sum(torch.mul(predict, target), dim=1) + self.smooth
         den = torch.sum(predict.pow(self.p) + target.pow(self.p), dim=1) + self.smooth
 
-        loss = 1 - num / den
+        diceloss = 1 - num / den
 
         if self.reduction == 'mean':
-            return loss.mean()
+            return self.weight*diceloss.mean() + (1-self.weight)*bceloss
         elif self.reduction == 'sum':
-            return loss.sum()
+            return self.weight*diceloss.sum() + (1-self.weight)*bceloss
         elif self.reduction == 'none':
-            return loss
+            return self.weight*diceloss + (1-self.weight)*bceloss
         else:
             raise Exception('Unexpected reduction {}'.format(self.reduction))

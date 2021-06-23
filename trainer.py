@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from trainer_visualizer import show_val_samples
 from torch.utils.tensorboard import SummaryWriter
 import copy
+from torch.nn.modules.loss import BCEWithLogitsLoss
 
 def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
     # training loop
@@ -41,7 +42,7 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
 
             # log partial metrics
             metrics['loss'].append(loss.item())
-            assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()"), "no logit loss function used" # Otherwise, torch sigmoid is not necessary here, e.g. with BCELoss  
+            # assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()", "BCEDiceLoss_Logits()"), "no logit loss function used" # Otherwise, torch sigmoid is not necessary here, e.g. with BCELoss  
             y_hat = torch.sigmoid(y_hat) # For metrics, torch.sigmoid needed!
             for k, fn in metric_fns.items():
                 metrics[k].append(fn(y_hat, y).item()) # TORCH SIGMOID HERE AS WELL -> LIKE A PREDICTION
@@ -65,7 +66,7 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
                 
                 # log partial metrics
                 metrics['val_loss'].append(loss.item())
-                assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()"), "no logit loss function used"  
+                # assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()", "BCEDiceLoss_Logits()"), "no logit loss function used"  
                 y_hat = torch.sigmoid(y_hat) # For metrics, torch.sigmoid needed!
                 for k, fn in metric_fns.items():
                     metrics['val_'+k].append(fn(y_hat, y).item())

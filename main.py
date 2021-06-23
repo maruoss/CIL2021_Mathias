@@ -8,8 +8,10 @@ from glob import glob
 from PIL import Image
 from pathlib import Path
 import time
+from torch.nn.modules.loss import BCEWithLogitsLoss
 from torch.utils import tensorboard
 import torchvision
+from torchvision import models
 from tqdm import tqdm
 import random
 from sklearn.model_selection import train_test_split
@@ -23,6 +25,7 @@ import torchvision.transforms.functional as TF
 # Local Module imports
 from dataset import CustomDataset
 from diceloss import BinaryDiceLoss_Logits
+from bce_diceloss import BCEDiceLoss_Logits
 from model import createDeepLabHead
 from trainer import train_model
 from metrics import accuracy_fn, patch_accuracy
@@ -220,7 +223,39 @@ plt.show()
 
 #%%
 
-# train_features, train_labels = next(iter(train_dataloader))
+# model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
+# model.to(default_device) #add to gpu
+model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True)
+# %%
+
+# for i in model.backbone:
+#     print(i)
+
+model.backbone
+
+#%%
+
+# for i in model.classifier:
+    # print(i)
+
+# %%
+
+# Finetuning or Feature extraction? Freeze backbone of resnet101
+for x in model.backbone.parameters():
+    x.requires_grad = False
+
+# %%
+
+train_features, train_labels = next(iter(train_dataloader))
+
+# %%
+
+patcher = nn.AvgPool2d(16)
+mask = patcher(train_labels)
+
+mask[:, 0][mask[:, 0] > 0.25] = 1
+mask
+
 
 # # train_features.shape
 # grid = torchvision.utils.make_grid(train_features)
@@ -429,11 +464,12 @@ for x in model.backbone.parameters():
     x.requires_grad = False
 
 # Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.000001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
-# loss_fn = nn.BCEWithLogitsLoss()
-# from diceloss import BinaryDiceLoss_Logits
-loss_fn = BinaryDiceLoss_Logits()
+# loss_fn = BCEWithLogitsLoss()
+# loss_fn = BinaryDiceLoss_Logits()
+loss_fn = BCEDiceLoss_Logits(weight_dice=0.8) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
+print(str(loss_fn))
 
 # patch_accuracy = patch_accuracy(y_hat, y, patch_size=16, cutoff=0.5)
 
@@ -442,7 +478,7 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
 # Load model from saved model to finetune:
-# model.load_state_dict(torch.load("state_e100lr.0001batch8img400+fine.e30lr.00001b2img224+fine.e30lr.0001b2img224.pt"))
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400.pt"))
 # # Check if model is on cuda
 # next(model.parameters()).device
 
@@ -450,10 +486,10 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # Train
 # model =, since train_model returns model with best val_loss, not from all epochs
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=20)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100)
 
 # %% Save model for tinetuning conv layers
-# torch.save(model.state_dict(), "state_e100lr.0001batch8img400+fine.e30lr.00001b2img224+fine.e30lr.0001b2img224+fine.e30lr.00001b8img400.pt")
+# torch.save(model.state_dict(), "state_bcedice0.8e100lr.0001batch8img400.pt")
 
 # %%
 # %load_ext tensorboard
