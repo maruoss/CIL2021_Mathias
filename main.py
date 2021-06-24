@@ -531,8 +531,8 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
 # # Load model from saved model to finetune:
-# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400_auxloss+patchloss.pt"))
-# # Check if model is on cuda
+# model.load_state_dict(torch.load("img224e100+img305e50.pt"))
+# Check if model is on cuda
 # next(model.parameters()).device
 
 # str(BCEDiceLoss_Logits(weight_dice=0.8))[:7]
@@ -540,13 +540,14 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # %%
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f"loss{name_loss}lr{LEARNING_RATE}batch{BATCH_SIZE}imgsize{resize_to[0]}"
+comment = hyperparam_string + "fromimg224e100img305e50"
 # Train
 # model =, since train_model returns model with best val_loss: "early stopped model"
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=hyperparam_string)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=50, comment=comment)
 
 # %% Save model for tinetuning conv layers
-# torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch8img400_auxloss+patchloss.pt")
+# torch.save(model.state_dict(), "img224e100+img305e50+img400e50.pt")
 
 # %%
 # %load_ext tensorboard
