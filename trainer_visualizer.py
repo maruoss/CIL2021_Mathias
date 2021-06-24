@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import gc
 
 def show_val_samples(x, y, y_hat):
     # training callback to show predictions on validation set
@@ -23,6 +23,10 @@ def show_val_samples(x, y, y_hat):
             axs[2, i].set_title(f'True {i}')
             axs[0, i].set_axis_off()
             axs[1, i].set_axis_off()
-            axs[2, i].set_axis_off()
-            
+            axs[2, i].set_axis_off() 
+             
     plt.show()
+    # Clear Memory!
+    fig.clf()
+    plt.close(fig)
+    gc.collect()

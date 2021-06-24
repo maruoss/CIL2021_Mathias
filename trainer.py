@@ -1,16 +1,22 @@
 import time
 import torch
+from torch import nn
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from trainer_visualizer import show_val_samples
+from torch.utils.tensorboard import SummaryWriter
+import copy
 
-def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs):
+def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs, comment:str):
     # training loop
-    # logdir = './tensorboard/net'
-    # writer = SummaryWriter(logdir)  # tensorboard writer (can also log images)
+    # logdir = 'tensorboard/100dice.lr0.001.batch8.img400.ep50'
+    writer = SummaryWriter(comment=comment)  # tensorboard writer (can also log images)
     since = time.time()
 
     history = {}  # collects metrics at the end of each epoch
+    best_val_loss = 1e10 # Initialize best val loss
+    best_model_wts = copy.deepcopy(model.state_dict()) # Initialize best model weights
+    best_epoch = 1 # Initialize at which epoch best model is saved
 
     for epoch in range(n_epochs):  # loop over the dataset multiple times
 
@@ -27,20 +33,34 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
             optimizer.zero_grad()  # zero out gradients
             y = y.to(device)
             x = x.to(device) # add to device here -> faster than in Dataset itself!
-            y_hat = model(x)["out"]  # forward pass #MATHIAS: need ["out"] for deeplabv3
+            # y_hat = model(x)["out"]  # forward pass #MATHIAS: need ["out"] for deeplabv3
             # # ADJUST: Round groundtruth to 0, 1? 
             # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF
-            loss = loss_fn(y_hat, y)
+            # loss = loss_fn(y_hat, y)
+            model_output = model(x) # Save ordered dict with outputs of classifier and aux classifier
+            y_hat = model_output["out"] # access output of main classifier
+            aux_output = model_output["aux"] # access output of aux classifier, only relevant for finetuning, doesnt seem to change a lot though
+            loss1 = loss_fn(y_hat, y) + 0.4 * loss_fn(aux_output, y)
+            # Patch loss
+            y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
+            y_patched = nn.functional.avg_pool2d(y, 16)
+            loss2 = loss_fn(y_hat_patched, y_patched)
+            ##
+            loss = 0.5 * loss1 + 0.5 * loss2 # Pixel loss and patch loss
             loss.backward()  # backward pass
-            optimizer.step()  # optimize weights
+            optimizer.step()  # take gradient step, optimize weights
 
             # log partial metrics
             metrics['loss'].append(loss.item())
-            assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()"), "no logit loss function used" # Otherwise, torch sigmoid is not necessary here, e.g. with BCELoss  
+            # assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()", "BCEDiceLoss_Logits()"), "no logit loss function used" # Otherwise, torch sigmoid is not necessary here, e.g. with BCELoss  
             y_hat = torch.sigmoid(y_hat) # For metrics, torch.sigmoid needed!
             for k, fn in metric_fns.items():
                 metrics[k].append(fn(y_hat, y).item()) # TORCH SIGMOID HERE AS WELL -> LIKE A PREDICTION
             pbar.set_postfix({k: sum(v)/len(v) for k, v in metrics.items() if len(v) > 0})
+
+            # Add transformed train image to tensorboard
+            # x0 = x[0].detach()
+            # writer.add_image("train_image_transformed", x0, epoch)
 
         # validation
         model.eval()
@@ -49,29 +69,67 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
                 x = x.to(device) # add to device here -> faster than in Dataset itself!
                 y = y.to(device)
                 # logits of pixel being 0 or 1:
-                y_hat = model(x)["out"] # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
+                # y_hat = model(x)["out"] # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
                 # # ADJUST: Round groundtruth to 0, 1? 
                 # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF 
-                loss = loss_fn(y_hat, y)
+                # loss = loss_fn(y_hat, y)
+                model_output = model(x) # Save ordered dict with outputs of classifier and aux classifier
+                y_hat = model_output["out"] # access output of main classifier
+                aux_output = model_output["aux"] # access output of aux classifier, only relevant if finetuning
+                loss1 = loss_fn(y_hat, y) + 0.4 * loss_fn(aux_output, y)
+                # Patch loss
+                y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
+                y_patched = nn.functional.avg_pool2d(y, 16)
+                loss2 = loss_fn(y_hat_patched, y_patched)
+                ##
+                loss = 0.5 * loss1 + 0.5 * loss2 # Pixel loss and patch loss
                 
                 # log partial metrics
                 metrics['val_loss'].append(loss.item())
-                assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()"), "no logit loss function used"  
+                # assert str(loss_fn) in ("BCEWithLogitsLoss()", "BinaryDiceLoss_Logits()", "BCEDiceLoss_Logits()"), "no logit loss function used"  
                 y_hat = torch.sigmoid(y_hat) # For metrics, torch.sigmoid needed!
                 for k, fn in metric_fns.items():
                     metrics['val_'+k].append(fn(y_hat, y).item())
 
+
         # summarize metrics, log to tensorboard and display
         history[epoch] = {k: sum(v) / len(v) for k, v in metrics.items()}
-        # for k, v in history[epoch].items():
-        #   writer.add_scalar(k, v, epoch)
-        print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()]))
-        show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy())
+        for k, v in history[epoch].items():
+          writer.add_scalar(k, v, epoch) # log to tensorboard
+        # writer.close() #close writer
+        print(' '.join(['\t- '+str(k)+' = '+str(v)+'\n ' for (k, v) in history[epoch].items()])) # print epoch losses/ metrics
+        # CAUTION: Below function causes Memory Leakage if run on a lot of epochs! (not solved yet):
+        # show_val_samples(x.detach().cpu().numpy(), y.detach().cpu().numpy(), y_hat.detach().cpu().numpy()) # show val samples and predicted masks
+
+        # Save model weights if best val loss in epoch:
+        if history[epoch]["val_loss"] < best_val_loss:
+            best_val_loss = history[epoch]["val_loss"]
+            best_model_wts = copy.deepcopy(model.state_dict()) # deepcopy otherwise its just referenced and saves overfitted model instead, recommended on PyTorch website.
+            best_epoch = epoch+1 # epoch starts at 0
+
+        # Add images to tensorboard, as eval dataloader is shuffled x will be different each instance
+        # x0, x1, y0, y1, y_hat0, y_hat1 = x[0], x[1], y[0], y[1], y_hat[0], y_hat[1]
+        # writer.add_image("val_image", x0, epoch)
+        # writer.add_image("val_groundtruth", y0, epoch)
+        # writer.add_image("predicted_mask", y_hat0, epoch)
+        to_visualize = 2
+        to_stack = []
+        for i in range(min(to_visualize, len(x))):
+            to_stack += [x[i].detach(), y[i].detach().repeat(3, 1, 1), y_hat[i].detach().repeat(3, 1, 1)] #detach, but still on GPU?
+        writer.add_images("val_image, val_groundtruth, prediction_mask", torch.stack(to_stack, dim=0), epoch)
+        # writer.add_images("val_image, val_groundtruth, prediction_mask", 
+        # torch.stack((x0, y0.repeat(3, 1, 1), y_hat0.repeat(3, 1, 1)), dim=0), epoch) # repeat y's with shape (1, H, W) along dim 0 -> (3, H, W)
+        writer.close()
+ 
+
+
 
     print('Finished Training')
     time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print(f"Total Epochs run: {n_epochs}")
+    print('Best validation loss: {:.4f} after {} epochs'.format(best_val_loss, best_epoch))
+    print(f"Model returned after {best_epoch} epochs")
 
     # Show plot for losses
     plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
@@ -89,3 +147,7 @@ def train_epoch(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
     #     plt.xlabel('Epochs')
     #     plt.legend()
     #     plt.show()
+
+    # load best model weights (lowest val loss in epochs)
+    model.load_state_dict(best_model_wts)
+    return model

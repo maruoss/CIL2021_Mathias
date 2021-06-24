@@ -8,6 +8,10 @@ from glob import glob
 from PIL import Image
 from pathlib import Path
 import time
+from torch.nn.modules.loss import BCEWithLogitsLoss
+from torch.utils import tensorboard
+import torchvision
+from torchvision import models
 from tqdm import tqdm
 import random
 from sklearn.model_selection import train_test_split
@@ -21,8 +25,9 @@ import torchvision.transforms.functional as TF
 # Local Module imports
 from dataset import CustomDataset
 from diceloss import BinaryDiceLoss_Logits
+from bce_diceloss import BCEDiceLoss_Logits
 from model import createDeepLabHead
-from trainer import train_epoch
+from trainer import train_model
 from metrics import accuracy_fn, patch_accuracy
 from augmentation import test_transform_fn
 
@@ -59,8 +64,16 @@ test_image_paths = get_filenames_of_path(root / "test_images" / "test_images") #
 print("Test set first path: ", test_image_paths[0])
 
 
+# %%
+# import torch
+# torch.tensor(3) + torch.tensor(3)
 
+# # %%
+# import numpy as np
+# a = np.array([1, 2, 3])
 
+# if isinstance(a, np.ndarray):
+#     print("yes")
 
 # %%
 # test_image_paths[0]
@@ -147,22 +160,45 @@ train_image_paths, val_image_paths, train_groundtruth_paths, val_groundtruth_pat
 assert [y[-7:] for y in [str(x) for x in train_image_paths]] == [y[-7:] for y in [str(x) for x in train_groundtruth_paths]]
 assert [y[-7:] for y in [str(x) for x in val_image_paths]] == [y[-7:] for y in [str(x) for x in val_groundtruth_paths]]
 
-
 # %%
 
 # Define device "cuda" for GPU, or "cpu" for CPU
 default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Define batch size for Dataloaders
-BATCH_SIZE = 8 # cannot be
+BATCH_SIZE = 8 # not too large, causing memory issues!
 
-# Instantiate Datasets for train and validation
-train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True) # train=True
-val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False) # train=False
+# Set picture size on which model will be trained
+resize_to = (224, 224)
 
-# Instantiate Loaders for these datasets, # SET BATCH SIZE HERE
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # BATCH SIZE
+# ***************************************************************************
+# 3 Options how to load in images:
+# 1a) Load from paths, LARGE SCALE: best if goal is to scale to a lot of images, dont have to load all images at once)
+
+# # 1b) Load images as PIL images, in a numpy array (gives PIL image loading warning, rather use 1c))
+# train_images = np.array([Image.open(img) for img in sorted(train_image_paths)])
+# train_groundtruths = np.array([Image.open(img) for img in sorted(train_groundtruth_paths)])
+# val_images = np.array([Image.open(img) for img in sorted(val_image_paths)])
+# val_groundtruths = np.array([Image.open(img) for img in sorted(val_groundtruth_paths)])
+
+# # 1c) Load images as np.array, in a numpy array # SMALL SCALE: reload seems to be faster at training. better for small set of images.
+train_images = np.stack([np.array(Image.open(img)) for img in sorted(train_image_paths)]) # no astype(float32)/255., as otherwise transform wouldnt work (needs PIL images, and TF.to_pil_image needs it in this format)
+train_groundtruths = np.stack([np.array(Image.open(img)) for img in sorted(train_groundtruth_paths)])
+val_images = np.stack([np.array(Image.open(img)) for img in sorted(val_image_paths)])
+val_groundtruths = np.stack([np.array(Image.open(img)) for img in sorted(val_groundtruth_paths)])
+
+# # For 1b), 1c): Instantiate Datasets for train and validation IMAGES
+train_dataset = CustomDataset(train_images, train_groundtruths, train=True, resize_to=resize_to) # train=True
+val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to=resize_to) # train=False
+
+# # For 1a): Instantiate Datasets for train and validation PATHS
+# train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True, resize_to=resize_to) # train=True
+# val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False, resize_to=resize_to) # train=False
+
+# %% ***************************************************************************
+# Instantiate Loaders for these datasets
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 
 
 # %%
@@ -183,47 +219,136 @@ plt.imshow(label, cmap="gray")
 plt.show()
 
 # torch.unique(label)
+# %%
+# Count class imbalance
+# Percent pixel of images
+Threshold = 0.25
+perc_pixel_train = (train_groundtruths / 255. > Threshold).sum() / np.ones(train_groundtruths.shape).sum()
+print(f"{perc_pixel_train*100:.2f}% of train images consist of roads")
 
+# Positive class weight
+road_weight = (train_groundtruths/255. <= Threshold).sum() / (train_groundtruths/255. > Threshold).sum()
+print(f'Road weight: Sum Train Pixel Background/ Sum Train Pixel Road = {road_weight:.2f}')
+
+# perc_pixel_train = (val_groundtruths / 255. > Threshold).sum() / np.ones(val_groundtruths.shape).sum()
+# print(f"{perc_pixel_train*100:.2f}% of val images consist of roads")
+
+# perc_pixel_train = ((train_groundtruths / 255. > Threshold).sum() + (val_groundtruths / 255. > 0.25).sum()) / (np.ones(train_groundtruths.shape).sum() + np.ones(val_groundtruths.shape).sum())
+# print(f"{perc_pixel_train*100:.2f}% of all images consist of roads")
+
+# (val_groundtruths / 255. > 0.).sum() / np.ones(val_groundtruths.shape).sum()
+
+
+# (train_groundtruths[0] /255.  > 0.25).sum()
+# 400*400
+# np.unique(train_groundtruths[0] / 255.)
+# np.ones(train_groundtruths.shape).sum()
+# np.ones(train_groundtruths.shape).shape
+# np.ones(train_groundtruths.shape).sum()
+# train_groundtruths / 255.
 
 #%%
 
+# model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
+# model.to(default_device) #add to gpu
+# model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True)
+# %%
 
+
+
+# for i in model.backbone:
+#     print(i)
+
+# for x in model.backbone.layer4.parameters():
+#     x.requires_grad = False
+
+# for x in model.backbone.parameters():
+#     print(x.requires_grad)
+
+#%%
+
+# for i in model.classifier:
+    # print(i)
+
+# %%
+
+# Finetuning or Feature extraction? Freeze backbone of resnet101
+# for x in model.backbone.parameters():
+#     x.requires_grad = False
+
+# %%
+
+train_features, train_labels = next(iter(train_dataloader))
+
+# %%
+
+# patcher = nn.AvgPool2d(16)
+# mask = patcher(train_labels)
+
+# mask[:, 0][mask[:, 0] > 0.25] = 1
+# mask
+
+
+# # train_features.shape
+# grid = torchvision.utils.make_grid(train_features)
+# grid.shape
+
+# x0, y0 = train_features[0], train_labels[0]
+# x1.shape
+# y0.requires_grad
+
+# np.equal(y0.repeat([3, 1, 1]).numpy() , np.concatenate(([y0.numpy()] * 3), 0)).all()
+
+#  np.concatenate(([y0.numpy()] * 3), 0)
+
+# np.concatenate(([y0.numpy()] * 3), 0)
+# y0.unsqueeze(0).repeat((1, 3, 1, 1)).shape
+
+
+
+
+#%%
 label = (label > 0.9).float()
 plt.imshow(label, cmap="gray") 
 plt.show()
 
-
 # %%
 
 # Test for image transformations:
-image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[0])), -1, 0))
-# label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
+# image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0))
+# # label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
 
-print(image.shape)
+# print(image.shape)
 
-# print(label.shape)
+# # print(label.shape)
 
-# transform = transforms.Compose([transforms.RandomRotation(90)])
-# image = transform(image)
+# # transform = transforms.Compose([transforms.RandomRotation(90)])
+# # image = transform(image)
 
-# image = transforms.functional.adjust_brightness(image, brightness_factor=3.)
-# image = transforms.functional.adjust_contrast(image, contrast_factor=3)
-# image = transforms.functional.adjust_hue(image, hue_factor=0.5)
-# image = transforms.functional.adjust_saturation(image, saturation_factor=3)
-# image = transforms.functional.adjust_sharpness(image, sharpness_factor=5)
-# image = transforms.functional.equalize(image)
+# image = TF.rgb_to_grayscale(image, num_output_channels=3)
+# # image = TF.gaussian_blur(image, kernel_size=9, sigma=0.5)
+# # image = transforms.functional.adjust_brightness(image, brightness_factor=1.4)
+# # image = transforms.functional.adjust_contrast(image, contrast_factor=1.2)
+# # image = transforms.functional.adjust_hue(image, hue_factor=0.1)
+# # image = transforms.functional.adjust_saturation(image, saturation_factor=0.8)
+# # image = transforms.functional.adjust_sharpness(image, sharpness_factor=0.8)
+# # image = transforms.functional.equalize(image)
 
-# i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.3, 0.3), ratio=(0.75, 1.33))
-# print(i, j, h, w)
-# image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
-# image = transforms.functional.resize(image, (224, 224))
-# image = transforms.functional.center_crop(image, (224, 224))
 
-# image = TF.vflip(image)
+# # i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.6, 0.6), ratio=(1, 1))
 
-plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+# # image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
 
-print(image)
+# # image = transforms.functional.resize(image, (224, 224))
+# # image = transforms.functional.center_crop(image, (224, 224))
+
+# # image = TF.vflip(image)
+
+# plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+# plt.show()
+
+
+# print(image.shape)
 
 # %%
 # import timeit
@@ -327,12 +452,29 @@ torch.empty(3).random_(2)
 
 
 # %%
-# Predict one instance, without learning anything
+# # Train one batch, without learning anything
 # model = createDeepLabHead()
-# model.to(device)
-# model.eval()
-# img = train_features[0] # Take first image from DataLoader
-# img = img.unsqueeze(0) # Unsqueeze for batch size = 1 -> [1, C, H, W]
+# model.to(default_device)
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400.pt"))
+# # Finetuning or Feature extraction? Freeze backbone of resnet101
+# for x in model.backbone.parameters():
+#     x.requires_grad = False
+# # model.eval()
+# img = train_features.to(default_device) # Take first image from DataLoader
+# a = model(img)["aux"]
+# b = model(img)["out"]
+# # %%
+# plt.imshow(torch.sigmoid(a[0][0]).detach().cpu().numpy(), cmap="gray")
+# plt.show()
+# plt.imshow(torch.sigmoid(b[0][0]).detach().cpu().numpy(), cmap="gray")
+# plt.show()
+
+# %%
+
+# (nn.functional.avg_pool2d(torch.sigmoid(b), 16) < 0.25).sum()
+
+
+# %%
 # print(img.shape)
 # with torch.no_grad():
 #     out = model(img)["out"].cpu()
@@ -356,8 +498,6 @@ torch.empty(3).random_(2)
 # plt.imshow(transforms.ToPILImage()(torch.cat([torch.moveaxis(out, 0, -1)]*3, 0).squeeze()))
 
 
-
-
 # %% ######################################### TRAIN ############################################################
 # Define global variables
 PATCH_SIZE = 16
@@ -371,12 +511,18 @@ model.to(default_device) #add to gpu
 for x in model.backbone.parameters():
     x.requires_grad = False
 
+# Set some layers of the backbone to learnable
+# for x in model.backbone.layer4.parameters():
+#     x.requires_grad = True
+
 # Instantiate optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+LEARNING_RATE = 0.001
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
-# loss_fn = nn.BCEWithLogitsLoss()
-# from diceloss import BinaryDiceLoss_Logits
-loss_fn = BinaryDiceLoss_Logits()
+# loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(2))
+# loss_fn = BinaryDiceLoss_Logits()
+loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
+# print(str(loss_fn))
 
 # patch_accuracy = patch_accuracy(y_hat, y, patch_size=16, cutoff=0.5)
 
@@ -384,16 +530,61 @@ loss_fn = BinaryDiceLoss_Logits()
 metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
+# # Load model from saved model to finetune:
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400_auxloss+patchloss.pt"))
+# # Check if model is on cuda
+# next(model.parameters()).device
+
+# str(BCEDiceLoss_Logits(weight_dice=0.8))[:7]
+
+# %%
+name_loss = str(loss_fn)[:7]
+hyperparam_string = f"loss{name_loss}lr{LEARNING_RATE}batch{BATCH_SIZE}imgsize{resize_to[0]}"
 # Train
-train_epoch(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=1)
+# model =, since train_model returns model with best val_loss: "early stopped model"
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=hyperparam_string)
+
+# %% Save model for tinetuning conv layers
+# torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch8img400_auxloss+patchloss.pt")
+
+# %%
+# %load_ext tensorboard
+# %%
+# !rm -rf ./tensorboard
+# %tensorboard --logdir tensorboard
+
+# To launch tensorboard successfully: Open terminal. Enter: "tensorboard --logdir tensorboard" or "tensorboard --logdir=tensorboard" (both work)  -> should open on localhost
+# %tensorboard --logdir=runs --host localhost --port 6006
 
 # %%
 
-# dict1 = {"test": 1, "train": 2}
+# torch.save(model.state_dict(), "statetest.pt")
+# import torch
+# dict1 = torch.load("statetest.pt")
+# model.load_state_dict(dict1)
+# # Check if model is on cuda
+# next(model.parameters()).device
 
-# # %%
-# for k, v in dict1.items():
+
+
+# %%
+
+# nest_dict = {1: {"train": 0.9, "val": 0.8}, 2: {"train": 0.7, "val": 0.6}}
+
+# %%
+# import numpy as np
+# a = [1, 2, 3]
+# b = np.array(a)
+
+# b[1]
+
+# %%
+
+# nest_dict[1]["val"]
+
+# %%
+# for k, v in nest_dict.items():
 #     print(k, v)
 
 
@@ -445,7 +636,7 @@ test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W
 model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
-        x = test_transform_fn(x, resize_to=(400, 400)) # apply test transform first. Resize to same shape model was trained on.
+        x = test_transform_fn(x, resize_to=(resize_to)) # apply test transform first. Resize to same shape model was trained on.
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for exp. batch dim
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
@@ -453,7 +644,7 @@ with torch.no_grad():  # do not keep track of gradients
         test_pred_list.append(test_pred) # append to list
 
 # %%
-# Show first and last predicted test masks
+# Show first and last predicted test masks and test images
 show_first_last_pred(test_pred_list, test_images, first_last=3)
 
 # %%
