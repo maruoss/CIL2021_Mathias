@@ -24,12 +24,22 @@ import torchvision.transforms.functional as TF
 
 # Local Module imports
 from dataset import CustomDataset
-from diceloss import BinaryDiceLoss_Logits
-from bce_diceloss import BCEDiceLoss_Logits
-from model import createDeepLabHead
+from losses.diceloss import BinaryDiceLoss_Logits
+from losses.bce_diceloss import BCEDiceLoss_Logits
+from models.model import createDeepLabHead
 from trainer import train_model
 from metrics import accuracy_fn, patch_accuracy
 from augmentation import test_transform_fn
+from trainer_baseline import train_baseline
+from models.unet_baseline import UNet_baseline
+from torchinfo import summary
+from models.trivial_baseline import Trivial_baseline
+from models.fcn_resnet50_baseline import createFCNHead
+from losses.cldiceloss import SoftDiceCLDice
+from models.deeplav3_mobilenet import createDeepLabHead_mobilenet
+from models.deeplabv3_resnet50 import createDeepLabHead_resnet50
+from losses.focalloss_kornia import BinaryFocalLossWithLogits
+from losses.bce_cldiceloss import BCE_SoftDiceCLDice
 
 # %%
 # Define random seeds
@@ -169,7 +179,7 @@ default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE = 8 # not too large, causing memory issues!
 
 # Set picture size on which model will be trained
-resize_to = (224, 224)
+resize_to = (400, 400)  
 
 # ***************************************************************************
 # 3 Options how to load in images:
@@ -220,6 +230,12 @@ plt.show()
 
 # torch.unique(label)
 # %%
+
+# train_features[0].shape
+
+
+
+# %%
 # Count class imbalance
 # Percent pixel of images
 Threshold = 0.25
@@ -255,7 +271,6 @@ print(f'Road weight: Sum Train Pixel Background/ Sum Train Pixel Road = {road_we
 # %%
 
 
-
 # for i in model.backbone:
 #     print(i)
 
@@ -282,11 +297,17 @@ train_features, train_labels = next(iter(train_dataloader))
 
 # %%
 
+len(train_labels.shape)
+
+# %%
+
 # patcher = nn.AvgPool2d(16)
 # mask = patcher(train_labels)
 
+# # mask[:, 0][mask[:, 0] > 0.25] = 1
 # mask[:, 0][mask[:, 0] > 0.25] = 1
 # mask
+# torch.unique(mask[:, 0])
 
 
 # # train_features.shape
@@ -305,49 +326,240 @@ train_features, train_labels = next(iter(train_dataloader))
 # y0.unsqueeze(0).repeat((1, 3, 1, 1)).shape
 
 
+#%%
+
+# orig_img = Image.open(image_paths[1])
+
+# def plot(imgs, with_orig=True, row_title=None, **imshow_kwargs):
+#     if not isinstance(imgs[0], list):
+#         # Make a 2d grid even if there's just 1 row
+#         imgs = [imgs]
+
+#     num_rows = len(imgs)
+#     num_cols = len(imgs[0]) + with_orig
+#     fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, squeeze=False)
+#     for row_idx, row in enumerate(imgs):
+#         row = [orig_img] + row if with_orig else row
+#         for col_idx, img in enumerate(row):
+#             ax = axs[row_idx, col_idx]
+#             ax.imshow(np.asarray(img), **imshow_kwargs)
+#             ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+#     if with_orig:
+#         axs[0, 0].set(title='Original image')
+#         axs[0, 0].title.set_size(8)
+#     if row_title is not None:
+#         for row_idx in range(num_rows):
+#             axs[row_idx, 0].set(ylabel=row_title[row_idx])
+
+#     plt.tight_layout()
+#     plt.show()
+
+# (top_left, top_right, bottom_left, bottom_right, center) = transforms.FiveCrop(size=(256, 256))(orig_img)
+
+# plot([top_left, top_right, bottom_left, bottom_right, center])
+
+
+# TF.to_tensor(top_left)
+
+
 
 
 #%%
+label = train_labels[0].squeeze()
 label = (label > 0.9).float()
+# label = transforms.functional.pad(label, padding=100, padding_mode="reflect")
+# label.shape
+# plt.imshow(torch.moveaxis(label.cpu(), 0, -1), cmap="gray")
+# plt.show()
 plt.imshow(label, cmap="gray") 
 plt.show()
 
 # %%
 
 # Test for image transformations:
-# image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0))
-# # label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
+image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0))
+# label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
+# image = train_features[0]
 
-# print(image.shape)
+print(image.shape)
+# print(label.shape)
 
-# # print(label.shape)
-
-# # transform = transforms.Compose([transforms.RandomRotation(90)])
-# # image = transform(image)
+# transform = transforms.Compose([transforms.RandomRotation(90)])
+# image = transform(image)
 
 # image = TF.rgb_to_grayscale(image, num_output_channels=3)
-# # image = TF.gaussian_blur(image, kernel_size=9, sigma=0.5)
-# # image = transforms.functional.adjust_brightness(image, brightness_factor=1.4)
-# # image = transforms.functional.adjust_contrast(image, contrast_factor=1.2)
-# # image = transforms.functional.adjust_hue(image, hue_factor=0.1)
-# # image = transforms.functional.adjust_saturation(image, saturation_factor=0.8)
-# # image = transforms.functional.adjust_sharpness(image, sharpness_factor=0.8)
-# # image = transforms.functional.equalize(image)
+# image = TF.gaussian_blur(image, kernel_size=9, sigma=0.5)
+# image = transforms.functional.adjust_brightness(image, brightness_factor=1.4)
+# image = transforms.functional.adjust_contrast(image, contrast_factor=1.2)
+# image = transforms.functional.adjust_hue(image, hue_factor=0.1)
+# image = transforms.functional.adjust_saturation(image, saturation_factor=0.8)
+# image = transforms.functional.adjust_sharpness(image, sharpness_factor=0.8)
+# image = transforms.functional.equalize(image)
 
 
-# # i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.6, 0.6), ratio=(1, 1))
+# image = transforms.functional.pad(image, padding=100, padding_mode="reflect")
+# image = TF.rotate(image, 45)
+# image = transforms.functional.center_crop(image, (400, 400))
 
+
+# # i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(1.0, 1.0), ratio=(1, 1))
 # # image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
 
-# # image = transforms.functional.resize(image, (224, 224))
-# # image = transforms.functional.center_crop(image, (224, 224))
+# i, j, h, w = transforms.RandomCrop.get_params(image, (256, 256))
+# image = transforms.functional.crop(image, i, j, h, w)
 
-# # image = TF.vflip(image)
+# i, j, h, w, v = transforms.RandomErasing.get_params(image, scale=(0.1, 0.1), ratio=(1, 1), value=[0])
+# image = TF.erase(image, i=i, j=j, h=h, w=w, v=v)
 
-# plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+
+# image = TF.hflip(image)
+# image = TF.rotate(image, 90)
+# image = transforms.functional.resize(image, (256, 256))
+# image = transforms.functional.center_crop(image, (128, 128))
+
+# image = TF.hflip(image)
+# image = TF.vflip(image)
+print(image.shape)
+plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+plt.show()
+
+# %%
+# # train_features.shape
+
+# # TF.to_tensor(train_images)
+
+# # a = Image.open(image_paths[1])
+# test = []
+# test.append(train_features)
+# test.append(TF.rotate(train_features, 90))
+# test.append(TF.rotate(train_features, 180)) # Rotate back 180° 
+# test.append(TF.rotate(train_features, 270)) # Rotate back 270°
+# test.append(TF.hflip(train_features)) # hflip back
+# test.append(TF.vflip(train_features)) #vlip fack
+# # test.append(TF.rotate(TF.hflip(train_features), 90)) # reflect about diagonal ac (a=(0,0), c=(1, 1))
+# # test.append(TF.rotate(TF.vflip(train_features), 90)) # reflect about diagonal bd (b=(1,0), d=(0, 1))
+
+# # torch.stack(test).shape
+
+
+# # a = torch.stack((train_features, TF.rotate(train_features, 90), TF.rotate(train_features, 180), 
+# #     TF.rotate(train_features, 270), TF.hflip(train_features), TF.vflip(train_features),
+# #     TF.rotate(TF.hflip(train_features), 90), TF.rotate(TF.vflip(train_features), 90))).view(-1, 3, 400, 400)
+
+
+# model = createDeepLabHead()
+# model.to(default_device)
+# model.load_state_dict(torch.load("state_bcedice0.5auxpatch.e100lr.001.batch8.img400+fine.bcedice0.5.e100.lr.00001bat2img224.pt"))
+# # Finetuning or Feature extraction? Freeze backbone of resnet101
+# model.eval()
+# with torch.no_grad():
+#     # a, b, c, d, e, f = torch.split(a, BATCH_SIZE)
+#     # a = torch.sigmoid(model(a.to(default_device))["out"])
+#     x = torch.stack([torch.sigmoid(model(i.to(default_device))["out"]) for i in test]).view(-1, 1, 400, 400)
+#     origimg, img90, img180, img270, imghflip, imgvflip, imgdiagac, imgdiagbd = torch.split(x, BATCH_SIZE)
+#     img90 = TF.rotate(img90, -90) # Rotate back 90°
+#     img180 = TF.rotate(img180, -180) # Rotate back 180° 
+#     img270 = TF.rotate(img270, -270) # Rotate back 270°
+#     imghflip = TF.hflip(imghflip) # hflip back
+#     imgvflip = TF.vflip(imgvflip) #vlip back
+#     imgdiagac = TF.hflip(TF.rotate(imgdiagac, -90)) # reflect about diagonal ac (a=(0,0), c=(1, 1))
+#     imgdiagbd = TF.vflip(TF.rotate(imgdiagbd, -90)) # reflect about diagonal bd (b=(1,0), d=(0, 1))
+#     y = torch.stack((origimg, img90, img180, img270, imghflip, imgvflip, imgdiagac, imgdiagbd))
+
+
+# %%
+
+# y.shape
+# plt.imshow(TF.to_pil_image(y.mean(0)[1]), cmap="gray")
 # plt.show()
 
+# #%%
+# plt.imshow(TF.to_pil_image(x[1]), cmap="gray")
+# plt.show()
 
+# # %%
+# train_features.shape[0]
+
+# train_features.shape
+# # %%
+# train_features_raw = torch.from_numpy(train_images).moveaxis(-1, 1)[8:16]
+# a = torch.stack((train_features_raw, TF.rotate(train_features_raw, 90), TF.rotate(train_features_raw, 180), 
+#     TF.rotate(train_features_raw, 270), TF.hflip(train_features_raw), TF.vflip(train_features_raw),
+#     TF.rotate(TF.hflip(train_features_raw), 90), TF.rotate(TF.vflip(train_features_raw), 90))).view(-1, 3, 400, 400)
+
+# %%
+
+# def pred_inv_transform(images: torch.tensor):
+#     origimg, img90, img180, img270, imghflip, imgvflip = torch.split(images, BATCH_SIZE)
+#     img90 = TF.rotate(img90, -90) # Rotate back 90°
+#     img180 = TF.rotate(img180, -180) # Rotate back 180° 
+#     img270 = TF.rotate(img270, -270) # Rotate back 270°
+#     imghflip = TF.hflip(imghflip) # hflip back
+#     imgvflip = TF.imgvflip(imgvflip) #vlip fack
+
+#     return 
+
+# Simulate output
+# a = torch.stack((train_features, TF.rotate(train_features, 90), TF.rotate(train_features, 180), 
+#     TF.rotate(train_features, 270), TF.hflip(train_features), TF.vflip(train_features),
+#     TF.rotate(TF.hflip(train_features), 90), TF.rotate(TF.vflip(train_features), 90))).view(-1, 3, 400, 400)
+# # a = a.to(default_device)
+# model = createDeepLabHead()
+# model.to(default_device)
+# model.load_state_dict(torch.load("state_bcedice0.5auxpatch.e100lr.001.batch8.img400+fine.bcedice0.5.e100.lr.00001bat2img224.pt"))
+# # Finetuning or Feature extraction? Freeze backbone of resnet101
+# model.eval()
+# with torch.no_grad():
+#     # a, b, c, d, e, f = torch.split(a, BATCH_SIZE)
+#     # a = torch.sigmoid(model(a.to(default_device))["out"])
+#     x = torch.stack([torch.sigmoid(model(i.to(default_device))["out"]) for i in torch.split(a, BATCH_SIZE)]).view(-1, 1, 400, 400)
+#     origimg, img90, img180, img270, imghflip, imgvflip, imgdiagac, imgdiagbd = torch.split(x, BATCH_SIZE)
+#     img90 = TF.rotate(img90, -90) # Rotate back 90°
+#     img180 = TF.rotate(img180, -180) # Rotate back 180° 
+#     img270 = TF.rotate(img270, -270) # Rotate back 270°
+#     imghflip = TF.hflip(imghflip) # hflip back
+#     imgvflip = TF.vflip(imgvflip) #vlip back
+#     imgdiagac = TF.hflip(TF.rotate(imgdiagac, -90)) # reflect about diagonal ac (a=(0,0), c=(1, 1))
+#     imgdiagbd = TF.vflip(TF.rotate(imgdiagbd, -90)) # reflect about diagonal bd (b=(1,0), d=(0, 1))
+#     y = torch.stack((origimg, img90, img180, img270, imghflip, imgvflip, imgdiagac, imgdiagbd))
+
+# %%
+
+# y.shape
+# plt.imshow(TF.to_pil_image(y.mean(0)[1]), cmap="gray")
+# plt.show()
+
+# %%
+# torch.split(x, BATCH_SIZE)[0].shape
+# a, b, c, d, e, f, g, h= torch.split(a, BATCH_SIZE)
+
+# b = TF.rotate(b, -90)
+# c = TF.rotate(c, -180)
+# d = TF.rotate(d, -270)
+# e = TF.hflip(e)
+# f = TF.vflip(f)
+# g = TF.hflip(TF.rotate(g, -90))
+# h = TF.vflip(TF.rotate(h, -90))
+
+# %%
+# plt.imshow(TF.to_pil_image(x[1]), cmap="gray")
+# plt.show()
+# %%
+# TF.to_pil_image(torch.stack((x[0][0], x[1][0])).mean(dim=0))
+
+
+# %%
+
+# TF.to_pil_image(g[0])
+
+
+
+
+# %%
+# tuple(TF._get_image_size(image))
+# len(list(range(-180, 181, 15)))
+# x.shape
 # print(image.shape)
 
 # %%
@@ -368,12 +580,10 @@ plt.show()
 # %%
 # image.view(3, -1).shape
 
-# %%
-
-# transforms.RandomResizedCrop.get_params(image, scale=(0.08, 1.0), ratio=(0.75, 1.3333))
 
 # %%
-
+# model.classifier
+# print(model)
 # a = Image.open(image_paths[0])
 # # print(len(a))
 # a = TF._get_image_size(a)
@@ -459,20 +669,25 @@ torch.empty(3).random_(2)
 # # Finetuning or Feature extraction? Freeze backbone of resnet101
 # for x in model.backbone.parameters():
 #     x.requires_grad = False
-# # model.eval()
+# model = Trivial_baseline()
+# model.eval()
 # img = train_features.to(default_device) # Take first image from DataLoader
-# a = model(img)["aux"]
-# b = model(img)["out"]
-# # %%
-# plt.imshow(torch.sigmoid(a[0][0]).detach().cpu().numpy(), cmap="gray")
-# plt.show()
-# plt.imshow(torch.sigmoid(b[0][0]).detach().cpu().numpy(), cmap="gray")
-# plt.show()
+# model(img)
+# torch.sigmoid(model(img))
+# # a = model(img)["aux"]
+# # b = model(img)["out"]
+# # # %%
+# # plt.imshow(torch.sigmoid(a[0][0]).detach().cpu().numpy(), cmap="gray")
+# # plt.show()
+# # plt.imshow(torch.sigmoid(b[0][0]).detach().cpu().numpy(), cmap="gray")
+# # plt.show()
 
 # %%
-
+# print(train_features.shape)
+# torch.sigmoid(torch.ones_like(train_features)[:,0:1]*-1e10)
 # (nn.functional.avg_pool2d(torch.sigmoid(b), 16) < 0.25).sum()
 
+# torch.zeros_like(train_features[:,0:1]).shape
 
 # %%
 # print(img.shape)
@@ -505,7 +720,14 @@ CUTOFF = 0.25
 
 # Instantiate model
 model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
-model.to(default_device) #add to gpu
+# model = createFCNHead() 
+# Baseline model
+# model = UNet_baseline(output_prob=False)
+# model = createDeepLabHead_resnet50()
+# model = createDeepLabHead_mobilenet()
+
+# Assign model to device. Important!
+model.to(default_device) #add to gpu (if available)
 
 # Finetuning or Feature extraction? Freeze backbone of resnet101
 for x in model.backbone.parameters():
@@ -522,7 +744,11 @@ optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(2))
 # loss_fn = BinaryDiceLoss_Logits()
 loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
-# print(str(loss_fn))
+# loss_fn = SoftDiceCLDice()
+# loss_fn = BCE_SoftDiceCLDice()
+# loss_fn = FocalLoss()
+# loss_fn = BinaryFocalLossWithLogits(alpha=0.25, reduction="mean")
+print("Loss function used:" + str(loss_fn))
 
 # patch_accuracy = patch_accuracy(y_hat, y, patch_size=16, cutoff=0.5)
 
@@ -531,23 +757,33 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
 # # Load model from saved model to finetune:
-# model.load_state_dict(torch.load("img224e100+img305e50.pt"))
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400.pt"))
 # Check if model is on cuda
 # next(model.parameters()).device
+
+# Show summary of model
+summary(model, (8, 3, 400, 400))
+
+
+# print(model.backbone.conv1)
+# model.classifier
+
+# for i in model.backbone.keys():
+#     print(i)
 
 # str(BCEDiceLoss_Logits(weight_dice=0.8))[:7]
 
 # %%
 name_loss = str(loss_fn)[:7]
-hyperparam_string = f"loss{name_loss}lr{LEARNING_RATE}batch{BATCH_SIZE}imgsize{resize_to[0]}"
-comment = hyperparam_string + "fromimg224e100img305e50"
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+comment = "" + hyperparam_string
 # Train
 # model =, since train_model returns model with best val_loss: "early stopped model"
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=50, comment=comment)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=comment)
 
 # %% Save model for tinetuning conv layers
-# torch.save(model.state_dict(), "img224e100+img305e50+img400e50.pt")
+# torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400+FINE.e50lr.0001batch2img224.pt")
 
 # %%
 # %load_ext tensorboard
@@ -641,7 +877,7 @@ with torch.no_grad():  # do not keep track of gradients
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for exp. batch dim
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
-        test_pred = torch.sigmoid(model(x)["out"]) # forward pass + sigmoid
+        test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
         test_pred_list.append(test_pred) # append to list
 
 # %%
