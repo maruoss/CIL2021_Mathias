@@ -958,151 +958,151 @@ create_submission(test_pred, test_image_paths, "deeplabv3_firstsub.csv")
 
 # np.concatenate([np.moveaxis(y_pred_list[1][0].detach().cpu().numpy(), 0, -1)] * 3, -1).shape
 
-# %%
-a = "text1"
+# # %%
+# a = "text1"
 
-print(a)
-assert str(a) in ("song", "text1"), "not text or song string"
-
-#%%
-
-import settings
-print(settings.current_settings)
-foo = settings.default_settings['foo']
-bar = settings.current_settings['bar']
-settings.current_settings['bar'] = True
-print(settings.current_settings)
-
-# %%
-
-default_settings = {'foo': True, 'bar': False}
-my_settings = {'foo': False}
-current_settings = default_settings.copy()
-current_settings.update(my_settings)
-print(default_settings)
-print(current_settings)
-
+# print(a)
+# assert str(a) in ("song", "text1"), "not text or song string"
 
 #%%
 
-for x in model.backbone.parameters():
-    print(x)
+# import settings
+# print(settings.current_settings)
+# foo = settings.default_settings['foo']
+# bar = settings.current_settings['bar']
+# settings.current_settings['bar'] = True
+# print(settings.current_settings)
 
-# %%
-train_features, train_labels = next(iter(train_dataloader))
-label = train_labels[0]
-torch.stack((label, label)).shape
+# # %%
 
-
-# %%
-(torch.stack((label, label)).round() == torch.stack((label, label -1)).round()).float().mean()
-
-# %%
-
-labelround = label.round().mean()
-
-# %%
-
-# print the version of CUDA being used by pytorch
-# print(torch.version.cuda)
-# !nvidia-smi
+# default_settings = {'foo': True, 'bar': False}
+# my_settings = {'foo': False}
+# current_settings = default_settings.copy()
+# current_settings.update(my_settings)
+# print(default_settings)
+# print(current_settings)
 
 
-# %%
+# #%%
+
+# for x in model.backbone.parameters():
+#     print(x)
+
+# # %%
+# train_features, train_labels = next(iter(train_dataloader))
+# label = train_labels[0]
+# torch.stack((label, label)).shape
 
 
-# for k, _  in dict1.items():
-#     print(k)
+# # %%
+# (torch.stack((label, label)).round() == torch.stack((label, label -1)).round()).float().mean()
 
-# %%
+# # %%
 
-(torch.count_nonzero(label.round(), dim=0) == label).float().mean()
+# labelround = label.round().mean()
 
-# (label == label).float().mean()
+# # %%
 
-
-# %%
-(torch.stack((label, label)).round() == torch.stack((label, label)).round()).float().mean()
-
-
-
-# %%
-a = torch.tensor([[2., 3.], [4, 5]])
-# %%
-print("x", "\n\nb")
-
-# %%
-a.mean(1, keepdim=True)
-
-# %%
-a[::-1][-1]
+# # print the version of CUDA being used by pytorch
+# # print(torch.version.cuda)
+# # !nvidia-smi
 
 
-# %%
-
-b = {"test": [], "val": []}
-
-# %%
-
-b["test"].append(1)
-b["val"].append(1)
-
-# %%
-
-{k: sum(v) / len(v) for k, v in b.items()}
-
-# %%
-
-a = 0
-
-# %%
-
-a += torch.tensor([1])
-
-# %%
-a = {"test":1}
-# %%
-b = {"train": 2}
-# %%
-
-c = a | b
-# %%
-
-img, label = next(iter(train_dataloader))
-# %%
-
-img.shape
+# # %%
 
 
-# %%
+# # for k, _  in dict1.items():
+# #     print(k)
 
-test = np.concatenate([img[0]]*10, -1)
-# %%
+# # %%
 
-# %%
-test.shape
-# %%
+# (torch.count_nonzero(label.round(), dim=0) == label).float().mean()
 
-plt.imshow(np.concatenate([np.moveaxis(label[0].detach().cpu().numpy(), 0, -1)] * 3, -1))
+# # (label == label).float().mean()
 
 
-# %%
-plt.imshow(label[0].squeeze().detach().cpu().numpy(), cmap="gray")
-
-# %%
-
-a = np.array([1, 2, 3, 4])
-# %%
-b= np.array([5, 6, 7, 8])
-# %%
-print(a.head(), b.head())
-# %%
+# # %%
+# (torch.stack((label, label)).round() == torch.stack((label, label)).round()).float().mean()
 
 
-a = np.array(([1, 2], [3, 4]))
-# %%
 
-b = torch.from_numpy(a)
+# # %%
+# a = torch.tensor([[2., 3.], [4, 5]])
+# # %%
+# print("x", "\n\nb")
 
-# %%
+# # %%
+# a.mean(1, keepdim=True)
+
+# # %%
+# a[::-1][-1]
+
+
+# # %%
+
+# b = {"test": [], "val": []}
+
+# # %%
+
+# b["test"].append(1)
+# b["val"].append(1)
+
+# # %%
+
+# {k: sum(v) / len(v) for k, v in b.items()}
+
+# # %%
+
+# a = 0
+
+# # %%
+
+# a += torch.tensor([1])
+
+# # %%
+# a = {"test":1}
+# # %%
+# b = {"train": 2}
+# # %%
+
+# c = a | b
+# # %%
+
+# img, label = next(iter(train_dataloader))
+# # %%
+
+# img.shape
+
+
+# # %%
+
+# test = np.concatenate([img[0]]*10, -1)
+# # %%
+
+# # %%
+# test.shape
+# # %%
+
+# plt.imshow(np.concatenate([np.moveaxis(label[0].detach().cpu().numpy(), 0, -1)] * 3, -1))
+
+
+# # %%
+# plt.imshow(label[0].squeeze().detach().cpu().numpy(), cmap="gray")
+
+# # %%
+
+# a = np.array([1, 2, 3, 4])
+# # %%
+# b= np.array([5, 6, 7, 8])
+# # %%
+# print(a.head(), b.head())
+# # %%
+
+
+# a = np.array(([1, 2], [3, 4]))
+# # %%
+
+# b = torch.from_numpy(a)
+
+# # %%
 
