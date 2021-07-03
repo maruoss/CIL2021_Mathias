@@ -279,7 +279,7 @@ with torch.no_grad():  # do not keep track of gradients
 
 # %%
 # Show first and last predicted test masks and test images
-show_first_last_pred(test_pred_list, test_images, first_last=3)
+# show_first_last_pred(test_pred_list, test_images, first_last=3)
 
 # %%
 #  Convert model outputs to mask labels
