@@ -38,12 +38,6 @@ def train_baseline(train_dataloader, eval_dataloader, model, loss_fn, metric_fns
             # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF
             loss = loss_fn(y_hat, y)
    
-            # Patch loss
-            y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
-            y_patched = nn.functional.avg_pool2d(y, 16)
-            loss2 = loss_fn(y_hat_patched, y_patched)
-            ##
-            loss = 0.5 * loss + 0.5 * loss2 # Pixel loss and patch loss
             loss.backward()  # backward pass
             optimizer.step()  # take gradient step, optimize weights
 
@@ -70,13 +64,6 @@ def train_baseline(train_dataloader, eval_dataloader, model, loss_fn, metric_fns
                 # # ADJUST: Round groundtruth to 0, 1? 
                 # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF 
                 loss = loss_fn(y_hat, y)
-    
-                # Patch loss
-                y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
-                y_patched = nn.functional.avg_pool2d(y, 16)
-                loss2 = loss_fn(y_hat_patched, y_patched)
-                ##
-                loss = 0.5 * loss + 0.5 * loss2 # Pixel loss and patch loss
                 
                 # log partial metrics
                 metrics['val_loss'].append(loss.item())

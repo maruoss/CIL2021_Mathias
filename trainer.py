@@ -1,4 +1,3 @@
-from test_augmentation import test_augmentation
 import time
 import torch
 from torch import nn
@@ -7,6 +6,8 @@ import matplotlib.pyplot as plt
 from trainer_visualizer import show_val_samples
 from torch.utils.tensorboard import SummaryWriter
 import copy
+from test_augmentation import test_augmentation
+from patch_test_augmentation import patch_test_augmentation
 
 def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs, comment:str):
     # training loop
@@ -75,8 +76,8 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
                 # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF 
                 # loss = loss_fn(y_hat, y)
                 model_output = model(x) # Save ordered dict with outputs of classifier and aux classifier
-                # y_hat = model_output["out"] # access output of main classifier
-                y_hat = test_augmentation(x, model=model, device=device) # TEST AUGMENTATION
+                y_hat = model_output["out"] # access output of main classifier
+                # y_hat = test_augmentation(x, model=model, device=device) # TEST AUGMENTATION
                 aux_output = model_output["aux"] # access output of aux classifier, only relevant if finetuning
                 loss = loss_fn(y_hat, y) + 0.4 * loss_fn(aux_output, y)
                 # Patch loss

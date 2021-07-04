@@ -40,6 +40,7 @@ from models.deeplav3_mobilenet import createDeepLabHead_mobilenet
 from models.deeplabv3_resnet50 import createDeepLabHead_resnet50
 from losses.focalloss_kornia import BinaryFocalLossWithLogits
 from losses.bce_cldiceloss import BCE_SoftDiceCLDice
+from patch_test_augmentation import patch_test_augmentation
 
 # %%
 # Define random seeds
@@ -299,8 +300,132 @@ train_features, train_labels = next(iter(train_dataloader))
 
 len(train_labels.shape)
 
-# %%
 
+#%% PATCH TEST AUGMENTATION
+# a = train_features
+
+# fold_params = dict(kernel_size=256, dilation=1, padding=0, stride=36)
+# fold = nn.Fold(output_size=400, **fold_params)
+# unfold = nn.Unfold(**fold_params)
+
+# # divisor
+# input_ones = torch.ones(a.shape, dtype=a.dtype)
+# divisor = fold(unfold(input_ones))
+
+# model = createDeepLabHead()
+# model.to(default_device)
+# model.load_state_dict(torch.load("state_bcedice0.5auxpatch.e100lr.001.batch8.img400+fine.bcedice0.5.e100.lr.00001bat2img224.pt"))
+# # Finetuning or Feature extraction? Freeze backbone of resnet101
+# model.eval()
+# with torch.no_grad():
+#     y_hat = patch_test_augmentation(a.to(default_device), model=model, device=default_device, patch_size=(256, 256))
+ 
+
+# plt.imshow(torch.sigmoid(y_hat)[0][0].cpu(), cmap="gray")
+# plt.show()
+
+
+# %%
+# UNFOLDING / FOLDING
+# import torch.nn.functional as F
+# a = train_features
+
+# transpose is necessary if manually folding/ unfolding
+# a = a.unfold(2, 256, 36).unfold(3, 256, 36).reshape(-1, 3, 256, 256)
+# g = a.unfold(2, 256, 36).unfold(3, 256, 36).transpose(1, 3).reshape(-1, 3, 256, 256)
+# plt.imshow(TF.to_pil_image(g[0]))
+# plt.show()
+# (a.unfold(2, 256, 36).unfold(3, 256, 36).transpose(1, 3).reshape(-1, 3, 256, 256)[0] == F.unfold(a, 256, stride=36)[0][:, 0].reshape(3, 256, 256)).all()
+
+# %%
+# plt.imshow(TF.to_pil_image(a[0]))
+# plt.show()
+
+# b = F.unfold(a, kernel_size=(256, 256), dilation=1, padding=0, stride=36)
+
+# # %% F.fold
+# print("b shape:", b.shape)
+# print("b reshaped:", b.reshape(-1, 3, 256, 256)[0].shape)
+# plt.imshow(TF.to_pil_image(b.reshape(-1, 3, 256, 256)[0]))
+# plt.show()
+# c = F.fold(b, output_size=[400, 400], kernel_size=(256, 256), dilation=1, padding=0, stride=36)
+# print("c shape:", c.shape)
+
+# # divisor
+# input_ones = torch.ones(a.shape, dtype=a.dtype)
+# divisor = F.fold(F.unfold(input_ones, kernel_size=(256, 256), dilation=1, padding=0, stride=36), output_size=400, kernel_size=(256, 256),
+# dilation=1, padding=0, stride=36)
+
+
+# plt.imshow(TF.to_pil_image(c[0] / divisor[0]))
+# plt.show()
+# %%
+# DIFFERENCE UNFOLD AND SLICING
+# a[:, :, :256, :256].shape
+# plt.imshow(TF.to_pil_image(a[:, :, :256, :256][0]))
+# plt.show()
+
+# b = F.unfold(a, kernel_size=(256, 256), dilation=1, padding=0, stride=36)
+# print("b shape:", b.shape)
+# print("b reshaped:", b.reshape(-1, 3, 256, 256)[0].shape)
+# plt.imshow(TF.to_pil_image(b.contiguous().view(-1, 3, 256, 256)[0]))
+# plt.show()
+
+# %%
+# Class syntax
+# fold_params = dict(kernel_size=256, dilation=1, padding=0, stride=36)
+# fold = nn.Fold(output_size=400, **fold_params)
+# unfold = nn.Unfold(**fold_params)
+
+# # divisor
+# input_ones = torch.ones(a.shape, dtype=a.dtype)
+# divisor = fold(unfold(input_ones))
+
+# #apply classes
+# d = fold(unfold(a))
+
+# plt.imshow(TF.to_pil_image(d[0] / divisor[0]))
+# plt.show()
+
+# # %%
+
+# plt.imshow(TF.to_pil_image(unfold(a)[0][:, 0].reshape(3, 256, 256)))
+# plt.show()
+
+# %%
+# a = train_features
+# model = createDeepLabHead()
+# model.to(default_device)
+# model.load_state_dict(torch.load("state_bcedice0.5auxpatch.e100lr.001.batch8.img400+fine.bcedice0.5.e100.lr.00001bat2img224.pt"))
+# # Finetuning or Feature extraction? Freeze backbone of resnet101
+# model.eval()
+# with torch.no_grad():
+#     a = unfold(a)[:, :, 0].reshape(8, 3, 256, 256)
+#     a = torch.sigmoid(model(a.to(default_device))["out"])
+
+# plt.imshow(a.cpu()[0].squeeze(0))
+# plt.show()
+
+
+# %%
+# a = train_features
+# input_ones = torch.ones(a.shape, dtype=a.dtype)
+# divisor = fold(unfold(input_ones))
+
+# torch.mean(a, dim=1, keepdim=True).shape
+
+# a[:, :1].shape
+# a = train_features
+# unfold(a)[:, :, 24].shape
+
+
+# %%
+# plt.imshow(TF.to_pil_image(unfold(a)[:, :, 0].reshape(8, 3, 256, 256)[0]))
+# plt.show()
+# torch.stack(([a.reshape(8, -1)]*25), dim=2).shape
+
+# unfold(a)[:, :, 0].reshape(8, 3, 256, 256).shape
+# fold(torch.stack(([a.reshape(8, -1)]*25), dim=2)).shape
 # patcher = nn.AvgPool2d(16)
 # mask = patcher(train_labels)
 
@@ -308,7 +433,7 @@ len(train_labels.shape)
 # mask[:, 0][mask[:, 0] > 0.25] = 1
 # mask
 # torch.unique(mask[:, 0])
-
+# (divisor[:, 0] == divisor[:, 2])
 
 # # train_features.shape
 # grid = torchvision.utils.make_grid(train_features)
@@ -327,7 +452,6 @@ len(train_labels.shape)
 
 
 #%%
-
 # orig_img = Image.open(image_paths[1])
 
 # def plot(imgs, with_orig=True, row_title=None, **imshow_kwargs):
@@ -622,10 +746,6 @@ plt.show()
 #         logits = self.linear_relu_stack(x)
 #         return logits
 
-# %%
-# from torchinfo import summary ->have to install with Pip, ideally after every other necessary package is installed with conda
-torch.empty(3).random_(2)
-
 
 # %%
 # DICE LOSS
@@ -719,12 +839,15 @@ PATCH_SIZE = 16
 CUTOFF = 0.25
 
 # Instantiate model
-model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
-# model = createFCNHead() 
+# function that loads pretrained deeplabv3 and changes classifier head
+# Model sizes calculated with input size (8, 3, 400, 400):
+
+model = createDeepLabHead() # 19GB (total size), 60Mio. Param, 18Mio. Trainable
+# model = createFCNHead() # 10GB (total size), 35 Mio. Params., 35 Mio. Trainable
 # Baseline model
-# model = UNet_baseline(output_prob=False)
-# model = createDeepLabHead_resnet50()
-# model = createDeepLabHead_mobilenet()
+# model = UNet_baseline(output_prob=False) # 8GB (total size), 31 Mio. Params, 31Mio trainable
+# model = createDeepLabHead_resnet50() # 11GB (total size), 41 Mio. Params, 18Mio. Trainable
+# model = createDeepLabHead_mobilenet() # 2.3GB (total size), 11 Mio. Total Params, 8 Mio. Trainable
 
 # Assign model to device. Important!
 model.to(default_device) #add to gpu (if available)
@@ -762,7 +885,7 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # next(model.parameters()).device
 
 # Show summary of model
-summary(model, (8, 3, 400, 400))
+summary(model, (4, 3, 256, 256))
 
 
 # print(model.backbone.conv1)
@@ -783,7 +906,7 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=comment)
 
 # %% Save model for tinetuning conv layers
-# torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400+FINE.e50lr.0001batch2img224.pt")
+# torch.save(model.state_dict(), "state_patchaug_bcedice0.5e100lr.001batch8img400_fullaug.pt")
 
 # %%
 # %load_ext tensorboard
@@ -874,7 +997,7 @@ model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
         x = test_transform_fn(x, resize_to=(resize_to)) # apply test transform first. Resize to same shape model was trained on.
-        x = torch.unsqueeze(x, 0) # unsqueeze first dim. for exp. batch dim
+        x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
         test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
