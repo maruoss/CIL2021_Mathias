@@ -165,8 +165,8 @@ optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(3))
 # loss_fn = BinaryDiceLoss_Logits()
 # loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
-loss_fn = SoftDiceCLDice()
-# loss_fn = BCE_SoftDiceCLDice()
+# loss_fn = SoftDiceCLDice()
+loss_fn = BCE_SoftDiceCLDice()
 # loss_fn = FocalLoss()
 # loss_fn = BinaryFocalLossWithLogits(alpha=0.25, reduction="mean")
 print("Loss function used:" + str(loss_fn))
@@ -187,7 +187,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "cascade9e"
+cascade_title = "cascade9f"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
