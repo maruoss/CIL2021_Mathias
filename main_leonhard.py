@@ -126,10 +126,10 @@ CUTOFF = 0.25
 default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Instantiate model
-model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
+# model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
 # model = createFCNHead() 
 # Baseline model
-# model = UNet_baseline(output_prob=False)
+model = UNet_baseline(output_prob=False)
 # model = createDeepLabHead_resnet50()
 # model = createDeepLabHead_mobilenet()
 
@@ -137,8 +137,8 @@ model = createDeepLabHead() # function that loads pretrained deeplabv3 and chang
 model.to(default_device) #add to gpu (if available)
 
 # Finetuning or Feature extraction? Freeze backbone of resnet101
-for x in model.backbone.parameters():
-    x.requires_grad = False
+# for x in model.backbone.parameters():
+#     x.requires_grad = False
 
 # Set some layers of the backbone to learnable
 # for x in model.backbone.layer4.parameters():
@@ -192,7 +192,7 @@ hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{r
 comment = cascade_title + hyperparam_string
 # 1. TRAIN
 # model =, since train_model returns model with best val_loss: "early stopped model"
-model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
@@ -217,14 +217,14 @@ name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
-model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% çççççççççççççççççççççççççFROM FREEZE TO FINETUNINGççççççççççççççççççççççççççççççççç
 # Switch to Finetune:
 # Finetuning or Feature extraction? Freeze backbone of resnet101
-for x in model.backbone.parameters():
-    x.requires_grad = True
+# for x in model.backbone.parameters():
+#     x.requires_grad = True
 
 # çççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççç
 # %% CASCADE TRAINS 3*************************************
@@ -246,7 +246,7 @@ name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
-model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% CASCADE TRAINS 4*************************************
@@ -268,11 +268,11 @@ name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
-model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
-torch.save(model.state_dict(), f"state{cascade_title}.pt")
+torch.save(model.state_dict(), f"state.{cascade_title}.loss.{loss_fn}.model.{model}.pt")
 
 
 
