@@ -124,25 +124,21 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
 
 
 
-def test_transform_fn(image: PIL or torch.tensor, resize_to=(400, 400)):
+def test_transform_fn(image: PIL or torch.tensor, resize_to=None):
         """preprocessing for image in test:
         -> Input: PIL or tensor, Output: PIL or tensor"""
 
         img_size = TF._get_image_size(image) # Get Size of Input Image (Tuple)
         
-        # Validation Augmentation
-        # 1. Resizing
-        size = resize_to # Adjust
-        image = TF.resize(image, size)
+        if resize_to is not None:
+            # 0. Resizing
+            size = resize_to # Adjust
+            image = TF.resize(image, size)
 
-        # # 2. Crop
-        # out_size = resize_to # Adjust
-        # image = TF.center_crop(image, out_size)
-
-        # 3. ToTensor
+        # 1. ToTensor
         image = TF.to_tensor(image)
 
-        # 4. Normalize
+        # 2. Normalize
         image = TF.normalize(image, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
         return image

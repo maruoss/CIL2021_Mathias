@@ -16,7 +16,15 @@ def patch_test_augmentation(imagebatch: torch.tensor, model, device, patch_size:
     patch_size = patch_size
 
     # Instantiate Unfold/ Fold classes
-    fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=144)
+    # To get 25 patches depending on input image size, stride needs to be different:
+    # Stride = ((input img size - kernel size) / (output_size - 1))
+    if input_spatialsize[0] == 608:
+        fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=88) # input size and dil, padd, stride determine num_patches
+    elif input_spatialsize[0] == 400:
+        fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=36) # input size and dil, padd, stride determine num_patches
+    else:
+        raise ValueError('Expected input image size ({}) to match target img size of 400 or 608'.format(input_spatialsize[0]))
+
     unfold = nn.Unfold(**fold_params)
     fold = nn.Fold(output_size=input_spatialsize, **fold_params) #final output size = input size
 
@@ -27,7 +35,8 @@ def patch_test_augmentation(imagebatch: torch.tensor, model, device, patch_size:
 
     # Collect patches in list
     collect_patches = []
-    num_patches = 4 # fixed here, calc. from Pytorch L = ... formula. -> depends on dilation, padding, stride
+    num_patches = 25 # outputsize**2, fixed here, could calc. from Pytorch L = ... formula. -> depends on dilation, padding, stride
+    # Outputsize = ((Input img. size - kernel size) / stride) + 1
 
     for i in range(num_patches):
         # Unfold image batch into [batchsize (8), 3*kernelsize[0]*kernelsize[1] (196608), num_patches (25)] -> take 1 patch and reshape to [B, C, K[0], K[1]]
@@ -66,4 +75,4 @@ def patch_test_augmentation(imagebatch: torch.tensor, model, device, patch_size:
     # Fold predictions back together to [B, 1, H, W] + Normalize
     y_hat_patch_aug = (fold(torch.stack(collect_patches, dim=2))) / divisor # Normalize: divide through sum of 1's (middle of image larger sum)
 
-    return y_hat_patch_aug #logits, no torch.sigmoid is used above
+    return y_hat_patch_aug #shape [B, 1, H, W], logits preds, no torch.sigmoid is used above

@@ -1,6 +1,7 @@
 # To add a new cell, type '# %%'
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
+from patch_test_augmentation import patch_test_augmentation
 import re
 import numpy as np
 import matplotlib.pyplot as plt
@@ -296,7 +297,7 @@ def create_submission(labels, test_filenames, submission_filename):
 
 # Function to show first and last test images and predicted masks
 def show_first_last_pred(pred_torch_list: list, image_list: list, first_last=5):
-    fig, axs = plt.subplots(first_last, 4, figsize=(10, 14))
+    fig, axs = plt.subplots(first_last, 4, figsize=(10, 7))
     for i in range(first_last):
         # Image plot
         axs[i, 0].imshow(image_list[i])
@@ -311,6 +312,7 @@ def show_first_last_pred(pred_torch_list: list, image_list: list, first_last=5):
         axs[i, 1].set_axis_off()
         axs[i, 2].set_axis_off()
         axs[i, 3].set_axis_off()
+    plt.show()
 
 # %%
 # Open first test image to have a look at it, resizing
@@ -328,8 +330,11 @@ test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W
 model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
-        x = test_transform_fn(x, resize_to=(resize_to)) # apply test transform first. Resize to same shape model was trained on.
-        x = torch.unsqueeze(x, 0) # unsqueeze first dim. for exp. batch dim
+        x = test_transform_fn(x, resize_to=(400, 400)) # apply test transform first. Resize to same shape model was trained on.
+        x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
+        # PATCH + TEST AUGMENTATION:
+        # test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(256, 256))
+        # Standard prediction:
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
         test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
