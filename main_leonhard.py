@@ -189,7 +189,7 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # next(model.parameters()).device
 
 # Show summary of model
-summary(model, (8, 3, 400, 400))
+summary(model, (BATCH_SIZE, 3, resize_to[0], resize_to[1]))
 
 
 # print(model.backbone.conv1)

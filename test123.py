@@ -30,3 +30,10 @@ if torch.cuda.is_available():
           gpu_properties.total_memory / 1e9))
 else:    
    print ("Cuda is not available")
+
+
+
+from pathlib import Path
+# Define root to current working directory + "/Data" -> LEONHARD: MAY HELP DETERM ROOT PATH
+root = Path.cwd() / 'Data'
+print("Your current working directory + '/ Data' path: \n" + str(root))
