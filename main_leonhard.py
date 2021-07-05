@@ -147,9 +147,9 @@ for x in model.backbone.parameters():
 
 # %% *********** PARAMETERS ********************
 # Define batch size for Dataloaders
-BATCH_SIZE = 32 # not too large, causing memory issues!
+BATCH_SIZE = 8 # not too large, causing memory issues!
 # Set picture size on which model will be trained
-resize_to = (256, 256)  
+resize_to = (400, 400)  
 # Instantiate Loaders for these datasets
 # # For 1b), 1c): Instantiate Datasets for train and validation IMAGES
 train_dataset = CustomDataset(train_images, train_groundtruths, train=True, resize_to=resize_to) # train=True
@@ -158,7 +158,7 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_S
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 
 # Instantiate optimizer
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
 # loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(2))
@@ -186,7 +186,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "cascade5"
+cascade_title = "cascade7"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -202,17 +202,17 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 
 # %% CASCADE TRAINS 2*************************************
 
-# BATCH SIZE, IMAGE SIZE
-BATCH_SIZE = 8 
-resize_to = (400, 400)  
-# Instantiate Loaders for these datasets
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
-# LEARNING RATE
-LEARNING_RATE = 0.001
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-# NUM EPOCHS
-N_EPOCHS = 100
+# # BATCH SIZE, IMAGE SIZE
+# BATCH_SIZE = 8 
+# resize_to = (400, 400)  
+# # Instantiate Loaders for these datasets
+# train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+# val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+# # LEARNING RATE
+# LEARNING_RATE = 0.001
+# optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+# # NUM EPOCHS
+# N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
@@ -231,25 +231,25 @@ for x in model.backbone.parameters():
 # çççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççç
 # %% CASCADE TRAINS 3*************************************
 
-# BATCH SIZE, IMAGE SIZE
-BATCH_SIZE = 8 
-resize_to = (256, 256)  
-# Instantiate Loaders for these datasets
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
-# LEARNING RATE
-LEARNING_RATE = 0.0001
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-# NUM EPOCHS
-N_EPOCHS = 100
+# # BATCH SIZE, IMAGE SIZE
+# BATCH_SIZE = 8 
+# resize_to = (256, 256)  
+# # Instantiate Loaders for these datasets
+# train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+# val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+# # LEARNING RATE
+# LEARNING_RATE = 0.0001
+# optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+# # NUM EPOCHS
+# N_EPOCHS = 100
 
-# Comments
-name_loss = str(loss_fn)[:7]
-hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{name_model}"
-comment = cascade_title + hyperparam_string
-# Train and save best model
-model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
+# # Comments
+# name_loss = str(loss_fn)[:7]
+# hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{name_model}"
+# comment = cascade_title + hyperparam_string
+# # Train and save best model
+# model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+#              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% CASCADE TRAINS 4*************************************
 
