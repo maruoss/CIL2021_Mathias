@@ -193,7 +193,7 @@ hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{r
 comment = cascade_title + hyperparam_string
 # 1. TRAIN
 # model =, since train_model returns model with best val_loss: "early stopped model"
-model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
@@ -218,7 +218,7 @@ name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{name_model}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
-model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% çççççççççççççççççççççççççFROM FREEZE TO FINETUNINGççççççççççççççççççççççççççççççççç
@@ -247,7 +247,7 @@ name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{name_model}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
-model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% CASCADE TRAINS 4*************************************
@@ -269,7 +269,7 @@ name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{name_model}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
-model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
