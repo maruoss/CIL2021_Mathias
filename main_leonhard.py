@@ -161,8 +161,8 @@ val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE,
 LEARNING_RATE = 0.001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
-loss_fn = BCEWithLogitsLoss()
-# loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(3))
+# loss_fn = BCEWithLogitsLoss()
+loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(3))
 # loss_fn = BinaryDiceLoss_Logits()
 # loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
 # loss_fn = SoftDiceCLDice()
