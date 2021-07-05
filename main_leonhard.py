@@ -131,8 +131,8 @@ default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # model = createFCNHead() 
 # Baseline model
 # model = UNet_baseline(output_prob=False)
-model = createDeepLabHead_resnet50()
-# model = createDeepLabHead_mobilenet()
+# model = createDeepLabHead_resnet50()
+model = createDeepLabHead_mobilenet()
 
 # Assign model to device. Important!
 model.to(default_device) #add to gpu (if available)
@@ -186,7 +186,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "cascade4"
+cascade_title = "cascade5"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
