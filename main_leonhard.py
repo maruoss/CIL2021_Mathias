@@ -127,12 +127,12 @@ CUTOFF = 0.25
 default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Instantiate model
-# model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
+model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
 # model = createFCNHead() 
 # Baseline model
 # model = UNet_baseline(output_prob=False)
 # model = createDeepLabHead_resnet50()
-model = createDeepLabHead_mobilenet()
+# model = createDeepLabHead_mobilenet()
 
 # Assign model to device. Important!
 model.to(default_device) #add to gpu (if available)
@@ -238,7 +238,7 @@ resize_to = (256, 256)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 # LEARNING RATE
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.0001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
 N_EPOCHS = 100
@@ -260,7 +260,7 @@ resize_to = (400, 400)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 # LEARNING RATE
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.0001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
 N_EPOCHS = 100
