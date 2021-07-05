@@ -146,7 +146,7 @@ model.to(default_device) #add to gpu (if available)
 
 # %% *********** PARAMETERS ********************
 # Define batch size for Dataloaders
-BATCH_SIZE = 32 # not too large, causing memory issues!
+BATCH_SIZE = 16 # not too large, causing memory issues!
 # Set picture size on which model will be trained
 resize_to = (256, 256)  
 # Instantiate Loaders for these datasets
@@ -185,7 +185,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = ".cascade1"
+cascade_title = ".cascade2"
 # ***************************************************
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
@@ -272,7 +272,7 @@ model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=m
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
-torch.save(model.state_dict(), f"state.{cascade_title}.loss.{loss_fn}.model.{model}.pt")
+torch.save(model.state_dict(), f"state{cascade_title}.loss.{loss_fn}.model.{model}.pt")
 
 
 
