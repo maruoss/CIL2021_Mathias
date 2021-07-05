@@ -112,13 +112,13 @@ def train_baseline(train_dataloader, eval_dataloader, model, loss_fn, metric_fns
     print('Best validation loss: {:.4f} after {} epochs'.format(best_val_loss, best_epoch))
     print(f"Model returned after {best_epoch} epochs")
 
-    # Show plot for losses
-    plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
-    plt.plot([v['val_loss'] for k, v in history.items()], label='Validation Loss')
-    plt.ylabel('Loss')
-    plt.xlabel('Epochs')
-    plt.legend()
-    plt.show()
+    # # Show plot for losses
+    # plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
+    # plt.plot([v['val_loss'] for k, v in history.items()], label='Validation Loss')
+    # plt.ylabel('Loss')
+    # plt.xlabel('Epochs')
+    # plt.legend()
+    # plt.show()
 
     # Show plots for all additional metrics # UNCOMMENT/ COMMENT OUT
     # for k, _ in metric_fns.items():

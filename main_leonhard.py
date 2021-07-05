@@ -188,7 +188,7 @@ N_EPOCHS = 100
 cascade_title = ".cascade2"
 # ***************************************************
 name_loss = str(loss_fn)[:7]
-hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{model}"
 comment = cascade_title + hyperparam_string
 # 1. TRAIN
 # model =, since train_model returns model with best val_loss: "early stopped model"
@@ -214,7 +214,7 @@ N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
-hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{model}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
 model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
@@ -243,7 +243,7 @@ N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
-hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{model}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
 model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
@@ -265,7 +265,7 @@ N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
-hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{model}"
 comment = cascade_title + hyperparam_string
 # Train and save best model
 model = train_baseline(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
