@@ -182,10 +182,14 @@ N_EPOCHS = 100
 # Show summary of model
 # summary(model, (BATCH_SIZE, 3, resize_to[0], resize_to[1]))
 
-# %%
+# %% ************************* START CASCADING **********************************
+# CASCADE TRAINS 1*************************************
+# Set title for tensorboard
+cascade_title = ".cascade1"
+# ***************************************************
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
-comment = "cascade0" + hyperparam_string
+comment = cascade_title + hyperparam_string
 # 1. TRAIN
 # model =, since train_model returns model with best val_loss: "early stopped model"
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
@@ -194,7 +198,7 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 # %% Save model for tinetuning conv layers
 # torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400+FINE.e50lr.0001batch2img224.pt")
 
-# %% CASCADE TRAINS 1*************************************
+# %% CASCADE TRAINS 2*************************************
 
 # BATCH SIZE, IMAGE SIZE
 BATCH_SIZE = 8 
@@ -211,19 +215,19 @@ N_EPOCHS = 100
 # Comments
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
-comment = ".cascade1" + hyperparam_string
+comment = cascade_title + hyperparam_string
 # Train and save best model
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
-# %% ççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççç
+# %% çççççççççççççççççççççççççFROM FREEZE TO FINETUNINGççççççççççççççççççççççççççççççççç
 # Switch to Finetune:
 # Finetuning or Feature extraction? Freeze backbone of resnet101
 for x in model.backbone.parameters():
     x.requires_grad = True
 
 # çççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççç
-# %% CASCADE TRAINS 2*************************************
+# %% CASCADE TRAINS 3*************************************
 
 # BATCH SIZE, IMAGE SIZE
 BATCH_SIZE = 8 
@@ -240,12 +244,12 @@ N_EPOCHS = 100
 # Comments
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
-comment = ".cascade1" + hyperparam_string
+comment = cascade_title + hyperparam_string
 # Train and save best model
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
-# %% CASCADE TRAINS 3*************************************
+# %% CASCADE TRAINS 4*************************************
 
 # BATCH SIZE, IMAGE SIZE
 BATCH_SIZE = 4 
@@ -262,13 +266,13 @@ N_EPOCHS = 100
 # Comments
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
-comment = ".cascade1" + hyperparam_string
+comment = cascade_title + hyperparam_string
 # Train and save best model
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
-torch.save(model.state_dict(), "state_cascade_test.pt")
+torch.save(model.state_dict(), f"state{cascade_title}.pt")
 
 
 
@@ -348,7 +352,7 @@ test_pred = test_pred.astype(float) #astype(float) converts Boolean to float32
 
 # %%
 # Create csv file for submission
-create_submission(test_pred, test_image_paths, "deeplabv3_firstsub.csv")
+create_submission(test_pred, test_image_paths, "deeplabv3_firstsub_leonhard.csv")
 
 
 
