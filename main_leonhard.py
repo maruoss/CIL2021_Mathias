@@ -127,10 +127,10 @@ default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Instantiate model
 # model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
-model = createFCNHead() 
+# model = createFCNHead() 
 # Baseline model
 # model = UNet_baseline(output_prob=False)
-# model = createDeepLabHead_resnet50()
+model = createDeepLabHead_resnet50()
 # model = createDeepLabHead_mobilenet()
 
 # Assign model to device. Important!
@@ -185,9 +185,9 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = ".cascade3"
+cascade_title = "cascade3"
 # ***************************************************
-name_model = str(model)[:9]
+name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}.model{name_model}"
 comment = cascade_title + hyperparam_string
@@ -273,7 +273,7 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
              metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
-torch.save(model.state_dict(), f"state{cascade_title}.loss.{name_loss}.model.{name_model}.pt")
+torch.save(model.state_dict(), f"state_{cascade_title}.loss.{name_loss}.model.{name_model}.pt")
 
 
 
@@ -353,7 +353,7 @@ test_pred = test_pred.astype(float) #astype(float) converts Boolean to float32
 
 # %%
 # Create csv file for submission
-create_submission(test_pred, test_image_paths, "deeplabv3_firstsub_leonhard.csv")
+create_submission(test_pred, test_image_paths, f"sub_{cascade_title}.loss.{name_loss}.model.{name_model}_leonhard.csv")
 
 
 
