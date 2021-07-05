@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import gc
 
+# Caution: will eat RAM -> error if a lot of epochs
+
 def show_val_samples(x, y, y_hat):
     # training callback to show predictions on validation set
     imgs_to_draw = min(5, len(x))

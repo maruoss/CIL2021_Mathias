@@ -73,8 +73,6 @@ print("Mask set first path: ", groundtruth_paths[0])
 test_image_paths = get_filenames_of_path(root / "test_images" / "test_images") # sorted already by pathlib somehow, see below
 print("Test set first path: ", test_image_paths[0])
 
-
-
 # %%
 # Split data into training validation set
 train_size = 0.9
@@ -86,18 +84,7 @@ train_image_paths, val_image_paths, train_groundtruth_paths, val_groundtruth_pat
 assert [y[-7:] for y in [str(x) for x in train_image_paths]] == [y[-7:] for y in [str(x) for x in train_groundtruth_paths]]
 assert [y[-7:] for y in [str(x) for x in val_image_paths]] == [y[-7:] for y in [str(x) for x in val_groundtruth_paths]]
 
-# %%
-
-# Define device "cuda" for GPU, or "cpu" for CPU
-default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-# Define batch size for Dataloaders
-BATCH_SIZE = 8 # not too large, causing memory issues!
-
-# Set picture size on which model will be trained
-resize_to = (400, 400)  
-
-# ***************************************************************************
+# ******************************LOAD IMAGES ***************************************
 # 3 Options how to load in images:
 # 1a) Load from paths, LARGE SCALE: best if goal is to scale to a lot of images, dont have to load all images at once)
 
@@ -113,37 +100,30 @@ train_groundtruths = np.stack([np.array(Image.open(img)) for img in sorted(train
 val_images = np.stack([np.array(Image.open(img)) for img in sorted(val_image_paths)])
 val_groundtruths = np.stack([np.array(Image.open(img)) for img in sorted(val_groundtruth_paths)])
 
-# # For 1b), 1c): Instantiate Datasets for train and validation IMAGES
-train_dataset = CustomDataset(train_images, train_groundtruths, train=True, resize_to=resize_to) # train=True
-val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to=resize_to) # train=False
-
 # # For 1a): Instantiate Datasets for train and validation PATHS
 # train_dataset = CustomDataset(train_image_paths, train_groundtruth_paths, train=True, resize_to=resize_to) # train=True
 # val_dataset = CustomDataset(val_image_paths, val_groundtruth_paths, train=False, resize_to=resize_to) # train=False
 
-# %% ***************************************************************************
-# Instantiate Loaders for these datasets
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
-val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
-
+# %% *************************************************************************
 
 # %%
 # Count class imbalance
 # Percent pixel of images
-Threshold = 0.25
-perc_pixel_train = (train_groundtruths / 255. > Threshold).sum() / np.ones(train_groundtruths.shape).sum()
-print(f"{perc_pixel_train*100:.2f}% of train images consist of roads")
+# Threshold = 0.25
+# perc_pixel_train = (train_groundtruths / 255. > Threshold).sum() / np.ones(train_groundtruths.shape).sum()
+# print(f"{perc_pixel_train*100:.2f}% of train images consist of roads")
 
-# Positive class weight
-road_weight = (train_groundtruths/255. <= Threshold).sum() / (train_groundtruths/255. > Threshold).sum()
-print(f'Road weight: Sum Train Pixel Background/ Sum Train Pixel Road = {road_weight:.2f}')
-
+# # Positive class weight
+# road_weight = (train_groundtruths/255. <= Threshold).sum() / (train_groundtruths/255. > Threshold).sum()
+# print(f'Road weight: Sum Train Pixel Background/ Sum Train Pixel Road = {road_weight:.2f}')
 
 
 # %% ######################################### TRAIN ############################################################
 # Define global variables
 PATCH_SIZE = 16
 CUTOFF = 0.25
+# Define device "cuda" for GPU, or "cpu" for CPU
+default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Instantiate model
 model = createDeepLabHead() # function that loads pretrained deeplabv3 and changes classifier head
@@ -164,8 +144,20 @@ for x in model.backbone.parameters():
 # for x in model.backbone.layer4.parameters():
 #     x.requires_grad = True
 
+# %% *********** PARAMETERS ********************
+# Define batch size for Dataloaders
+BATCH_SIZE = 32 # not too large, causing memory issues!
+# Set picture size on which model will be trained
+resize_to = (256, 256)  
+# Instantiate Loaders for these datasets
+# # For 1b), 1c): Instantiate Datasets for train and validation IMAGES
+train_dataset = CustomDataset(train_images, train_groundtruths, train=True, resize_to=resize_to) # train=True
+val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to=resize_to) # train=False
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+
 # Instantiate optimizer
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # Define loss function, BCEWithLogitLoss -> needs no sigmoid layer in neural net (num. stability)
 # loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(2))
@@ -176,52 +168,113 @@ loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*Dic
 # loss_fn = FocalLoss()
 # loss_fn = BinaryFocalLossWithLogits(alpha=0.25, reduction="mean")
 print("Loss function used:" + str(loss_fn))
-
-# patch_accuracy = patch_accuracy(y_hat, y, patch_size=16, cutoff=0.5)
-
 # Define metrics
 metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
+# NUM EPOCHS
+N_EPOCHS = 100
 
+# ****************************************************
 # %%
 # # Load model from saved model to finetune:
 # model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400.pt"))
 # Check if model is on cuda
 # next(model.parameters()).device
-
 # Show summary of model
-summary(model, (BATCH_SIZE, 3, resize_to[0], resize_to[1]))
-
-
-# print(model.backbone.conv1)
-# model.classifier
-
-# for i in model.backbone.keys():
-#     print(i)
-
-# str(BCEDiceLoss_Logits(weight_dice=0.8))[:7]
+# summary(model, (BATCH_SIZE, 3, resize_to[0], resize_to[1]))
 
 # %%
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
-comment = "" + hyperparam_string
-# Train
+comment = "cascade0" + hyperparam_string
+# 1. TRAIN
 # model =, since train_model returns model with best val_loss: "early stopped model"
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=comment)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
 
 # %% Save model for tinetuning conv layers
 # torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400+FINE.e50lr.0001batch2img224.pt")
 
+# %% CASCADE TRAINS 1*************************************
+
+# BATCH SIZE, IMAGE SIZE
+BATCH_SIZE = 8 
+resize_to = (400, 400)  
+# Instantiate Loaders for these datasets
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+# LEARNING RATE
+LEARNING_RATE = 0.001
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+# NUM EPOCHS
+N_EPOCHS = 100
+
+# Comments
+name_loss = str(loss_fn)[:7]
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+comment = ".cascade1" + hyperparam_string
+# Train and save best model
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
+
+# %% ççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççç
+# Switch to Finetune:
+# Finetuning or Feature extraction? Freeze backbone of resnet101
+for x in model.backbone.parameters():
+    x.requires_grad = True
+
+# çççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççççç
+# %% CASCADE TRAINS 2*************************************
+
+# BATCH SIZE, IMAGE SIZE
+BATCH_SIZE = 8 
+resize_to = (256, 256)  
+# Instantiate Loaders for these datasets
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+# LEARNING RATE
+LEARNING_RATE = 0.00001
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+# NUM EPOCHS
+N_EPOCHS = 100
+
+# Comments
+name_loss = str(loss_fn)[:7]
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+comment = ".cascade1" + hyperparam_string
+# Train and save best model
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
+
+# %% CASCADE TRAINS 3*************************************
+
+# BATCH SIZE, IMAGE SIZE
+BATCH_SIZE = 4 
+resize_to = (400, 400)  
+# Instantiate Loaders for these datasets
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
+val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+# LEARNING RATE
+LEARNING_RATE = 0.00001
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+# NUM EPOCHS
+N_EPOCHS = 100
+
+# Comments
+name_loss = str(loss_fn)[:7]
+hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
+comment = ".cascade1" + hyperparam_string
+# Train and save best model
+model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=N_EPOCHS, comment=comment)
+
+# %% Save model for tinetuning conv layers
+torch.save(model.state_dict(), "state_cascade_test.pt")
+
+
+
+
+
 # %%
-# %load_ext tensorboard
-# %%
-# !rm -rf ./tensorboard
-# %tensorboard --logdir tensorboard
-
-# To launch tensorboard successfully: Open terminal. Enter: "tensorboard --logdir tensorboard" or "tensorboard --logdir=tensorboard" (both work)  -> should open on localhost
-# %tensorboard --logdir=runs --host localhost --port 6006
-
-
 # ***************************************** PREDICTION ************************************************************
 # Test prediction
 # %% Taken from CIL Tutorial, https://colab.research.google.com/github/dalab/lecture_cil_public/blob/master/exercises/2021/Project_3.ipynb#scrollTo=cKQvTg8gE9JC
@@ -300,3 +353,12 @@ create_submission(test_pred, test_image_paths, "deeplabv3_firstsub.csv")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% END %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# %%
+# %load_ext tensorboard
+# %%
+# !rm -rf ./tensorboard
+# %tensorboard --logdir tensorboard
+
+# To launch tensorboard successfully: Open terminal. Enter: "tensorboard --logdir tensorboard" or "tensorboard --logdir=tensorboard" (both work)  -> should open on localhost
+# %tensorboard --logdir=runs --host localhost --port 6006
