@@ -166,9 +166,9 @@ optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # loss_fn = BinaryDiceLoss_Logits()
 # loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
 # loss_fn = SoftDiceCLDice()
-loss_fn = BCE_SoftDiceCLDice()
+# loss_fn = BCE_SoftDiceCLDice()
 # loss_fn = FocalLoss()
-# loss_fn = BinaryFocalLossWithLogits(alpha=0.25, reduction="mean")
+loss_fn = BinaryFocalLossWithLogits(alpha=0.25, reduction="mean")
 print("Loss function used:" + str(loss_fn))
 # Define metrics
 metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
@@ -187,7 +187,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_cascade8"
+cascade_title = "_cascade9_FOCAL"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -267,7 +267,7 @@ val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 # LEARNING RATE
-LEARNING_RATE = 0.000001
+LEARNING_RATE = 0.001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
 N_EPOCHS = 500
