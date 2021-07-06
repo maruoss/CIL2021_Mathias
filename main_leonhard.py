@@ -187,7 +187,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_cascade4"
+cascade_title = "_cascade5"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -267,7 +267,7 @@ val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 # LEARNING RATE
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.000001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
 N_EPOCHS = 500
