@@ -187,7 +187,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_cascade12"
+cascade_title = "_cascade13"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
