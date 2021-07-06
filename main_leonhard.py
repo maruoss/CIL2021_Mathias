@@ -267,7 +267,7 @@ val_dataset = CustomDataset(val_images, val_groundtruths, train=False, resize_to
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True) # pin memory speeds up the host to device transfer
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 # LEARNING RATE
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.00001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
 N_EPOCHS = 300
