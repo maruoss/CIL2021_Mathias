@@ -20,10 +20,10 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
         # Validation Augmentation
         if not train:
 
-            pass
+
             # 1. Resizing # Either resize here or predict via patching (in trainer.py file)
-            # image = TF.resize(image, resize_to)
-            # segmentation = TF.resize(segmentation, resize_to)
+            image = TF.resize(image, resize_to)
+            segmentation = TF.resize(segmentation, resize_to)
 
             # # 2. Crop
             # out_size = resize_to # Adjust
