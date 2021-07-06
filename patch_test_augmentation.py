@@ -18,7 +18,7 @@ def patch_test_augmentation(imagebatch: torch.tensor, model, device, patch_size:
     # Instantiate Unfold/ Fold classes
     # To get 25 patches depending on input image size, stride needs to be different:
     # Stride = ((input img size - kernel size) / (output_size - 1))
-    if input_spatialsize[0] == 608: # stride 88 for 256 kernel, stride 52 for 400 kernel 
+    if input_spatialsize[0] == 608: # stride 88 for 256 kernel, stride 52 for 400 kernel (to get 5*5 num patches)
         fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=88) # input size and dil, padd, stride determine num_patches
     elif input_spatialsize[0] == 400:
         fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=36) # input size and dil, padd, stride determine num_patches

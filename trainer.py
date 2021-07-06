@@ -43,7 +43,7 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
             y_hat = model_output["out"] # access output of main classifier
             aux_output = model_output["aux"] # access output of aux classifier, only relevant for finetuning, doesnt seem to change a lot though
             loss = loss_fn(y_hat, y) + 0.4 * loss_fn(aux_output, y)
-            # Patch loss
+            # Patch loss (commented out, seems to not influence training?)
             # y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
             # y_patched = nn.functional.avg_pool2d(y, 16)
             # loss2 = loss_fn(y_hat_patched, y_patched)
