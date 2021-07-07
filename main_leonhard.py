@@ -187,7 +187,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_cascade18_400_RANDOMRESIZECROP"
+cascade_title = "_cascade19_300EPOCHSFREEZE"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -215,7 +215,7 @@ val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE,
 LEARNING_RATE = 0.0001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
-N_EPOCHS = 100
+N_EPOCHS = 300
 
 # Comments
 name_loss = str(loss_fn)[:7]
