@@ -67,10 +67,10 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
                 image = TF.vflip(image)
                 segmentation = TF.vflip(segmentation)
 
-            # 6. Random Grayscale
-            if random.random() > 0.5:
-                image = TF.rgb_to_grayscale(image, num_output_channels=3)
-                # not needed for segmentation mask        
+            # # 6. Random Grayscale
+            # if random.random() > 0.5:
+            #     image = TF.rgb_to_grayscale(image, num_output_channels=3)
+            #     # not needed for segmentation mask        
 
             # 7. Gaussian Blur
             if random.random() > 0.5:
