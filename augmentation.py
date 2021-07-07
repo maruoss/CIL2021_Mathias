@@ -49,7 +49,7 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
 
             # 2. Random resize crop: simulate "zoom-in" + resize of satellite images # COMMENTED OUT: TEST IMAGES ARE RATHER ZOOMED "OUT"!
             if input_img_size == list(resize_to): # if (400, 400) == (400, 400), otherwise 3. Random crop will give a too small image
-                i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.1, 1.0), ratio=(1., 1.))
+                i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.5, 1.0), ratio=(1., 1.))
                 image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=input_img_size)  # Resize to input image size
                 segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=input_img_size)
 
