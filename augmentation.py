@@ -114,10 +114,12 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
         image = TF.normalize(image, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         # not needed for segmentation
 
-        # 5. Random Erasing
-        # Randomly erase a square of scale 0.1, value=None -> random values.
-        i, j, h, w, v = transforms.RandomErasing.get_params(image, scale=(0.1, 0.1), ratio=(1, 1), value=None)
-        image = TF.erase(image, i=i, j=j, h=h, w=w, v=v)
+        # ONLY TO TRAIN IMAGES!
+        if train:
+            # 5. Random Erasing
+            # Randomly erase a square of scale 0.1, value=None -> random values.
+            i, j, h, w, v = transforms.RandomErasing.get_params(image, scale=(0.1, 0.1), ratio=(1, 1), value=None)
+            image = TF.erase(image, i=i, j=j, h=h, w=w, v=v)
 
 
         return image, segmentation
