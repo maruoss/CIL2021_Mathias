@@ -15,7 +15,7 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
             image = TF.to_pil_image(image)  
             segmentation = TF.to_pil_image(segmentation)
 
-        input_img_size = TF._get_image_size(image) # Get Size of Input Image as list
+        input_img_size = TF._get_image_size(image) # Get Size of Input Image as list. expected: [400, 400]
         
         # Validation Augmentation
         if not train:
@@ -47,10 +47,11 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
             image = TF.center_crop(image, input_img_size)
             segmentation = TF.center_crop(segmentation, input_img_size)
 
-            # # 2. Random resize crop: simulate "zoom-in" + resize of satellite images # COMMENTED OUT: TEST IMAGES ARE RATHER ZOOMED "OUT"!
-            # i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(1.0, 1.0), ratio=(1., 1.))
-            # image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=input_img_size)  # Resize to input image size
-            # segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=input_img_size)
+            # 2. Random resize crop: simulate "zoom-in" + resize of satellite images # COMMENTED OUT: TEST IMAGES ARE RATHER ZOOMED "OUT"!
+            if input_img_size == list(resize_to): # if (400, 400) == (400, 400), otherwise 3. Random crop will give a too small image
+                i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.1, 1.0), ratio=(1., 1.))
+                image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=input_img_size)  # Resize to input image size
+                segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=input_img_size)
 
             # 3. Random crop ("zooms in", to predict on patches)
             i, j, h, w = transforms.RandomCrop.get_params(image, resize_to) # crop to desired size
