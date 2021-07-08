@@ -19,9 +19,15 @@ def patch_test_augmentation(imagebatch: torch.tensor, model, device, patch_size:
     # To get 25 patches depending on input image size, stride needs to be different:
     # Stride = ((input img size - kernel size) / (output_size - 1))
     if input_spatialsize[0] == 608: # stride 88 for 256 kernel, stride 52 for 400 kernel (to get 5*5 num patches)
-        fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=88) # input size and dil, padd, stride determine num_patches
+        if patch_size[0] == 256:
+            fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=88) # input size and dil, padd, stride determine num_patches
+        elif patch_size[0] == 400:
+            fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=52)
+        else:
+            raise ValueError('Expected kernel size ({}) to match either 256 or 400'.format(patch_size[0]))
     elif input_spatialsize[0] == 400:
-        fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=36) # input size and dil, padd, stride determine num_patches
+        fold_params = dict(kernel_size=patch_size, dilation=1, padding=0, stride=36) # stride 36 for 256 kernel to yield 25 patches
+        # input size and dil, padd, stride determine num_patches
     else:
         raise ValueError('Expected input image size ({}) to match target img size of 400 or 608'.format(input_spatialsize[0]))
 

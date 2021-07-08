@@ -147,7 +147,7 @@ print("Loss function used:" + str(loss_fn))
 # Define metrics
 metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 # NUM EPOCHS
-N_EPOCHS = 1
+N_EPOCHS = 100
 
 # ****************************************************
 # %%
@@ -187,7 +187,7 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_S
 LEARNING_RATE = 0.0001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
-N_EPOCHS = 1
+N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
@@ -216,7 +216,7 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_S
 LEARNING_RATE = 0.0001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
-N_EPOCHS = 1
+N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
@@ -238,7 +238,7 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_S
 LEARNING_RATE = 0.00001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
-N_EPOCHS = 1
+N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
@@ -260,7 +260,7 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_S
 LEARNING_RATE = 0.000001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
-N_EPOCHS = 1
+N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
@@ -328,7 +328,7 @@ test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W
 model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
-        x = test_transform_fn(x, resize_to=(400, 400)) # apply test transform first. Resize to same shape model was trained on.
+        x = test_transform_fn(x, resize_to=None) # apply test transform first. Resize to same shape model was trained on.
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
         # PATCH + TEST AUGMENTATION:
         # test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(256, 256))
