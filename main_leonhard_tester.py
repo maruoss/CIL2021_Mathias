@@ -162,7 +162,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_PRED4_400_TESTAUG"
+cascade_title = "_PRED5_608_PATCHTESTAUG_PATCHSIZE400"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -329,11 +329,11 @@ test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W
 model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
-        x = test_transform_fn(x, resize_to=(400, 400)) # apply test transform first. Resize to same shape model was trained on.
+        x = test_transform_fn(x, resize_to=None) # apply test transform first. Resize to same shape model was trained on.
         print("x shape:", x.shape)
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
         # PATCH + TEST AUGMENTATION:
-        test_pred = test_augmentation(x, model=model, device=default_device)
+        test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(400, 400))
         # Standard prediction:
         # x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
