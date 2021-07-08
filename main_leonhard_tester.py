@@ -162,7 +162,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_PRED5_608_PATCHTESTAUG_PATCHSIZE400"
+cascade_title = "_PRED6_608_PATCHTESTAUG_PATCHSIZE256"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -333,7 +333,7 @@ with torch.no_grad():  # do not keep track of gradients
         print("x shape:", x.shape)
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
         # PATCH + TEST AUGMENTATION:
-        test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(400, 400))
+        test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(256, 256))
         # Standard prediction:
         # x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
