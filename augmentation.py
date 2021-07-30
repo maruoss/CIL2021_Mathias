@@ -15,15 +15,15 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
             image = TF.to_pil_image(image)  
             segmentation = TF.to_pil_image(segmentation)
 
-        img_size = TF._get_image_size(image) # Get Size of Input Image
+        input_img_size = TF._get_image_size(image) # Get Size of Input Image as list. expected: [400, 400]
         
         # Validation Augmentation
         if not train:
 
-            # 1. Resizing
-            size = resize_to # Adjust
-            image = TF.resize(image, size)
-            segmentation = TF.resize(segmentation, size)
+            pass
+            # 1. Resizing # Either resize here (seems to be worse than just having original size) or predict via patching (in trainer.py file)
+            # image = TF.resize(image, resize_to)
+            # segmentation = TF.resize(segmentation, resize_to)
 
             # # 2. Crop
             # out_size = resize_to # Adjust
@@ -32,45 +32,55 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
 
         # Training Augmentation
         if train:
-            # 1. Random resize crop
-            # i = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
-            # j = random.randint(0, img_size[1]-200) # -100 so that not (400, 400) chosen as left upper coordinate
-            # h = random.randint(200, img_size[1])
-            # w = random.randint(200, img_size[1])
-            i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.7, 1.0), ratio=(1., 1.))
-            size = resize_to
-            image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=size)
-            segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=size)
-
-            # 2. Rotation
-            if random.random() > 0.5: # Adjust
-                angle = random.randint(-180, 180) # Adjust
-                image = TF.rotate(image, angle)
-                segmentation = TF.rotate(segmentation, angle)
             
-            # 3. Horizontal flip
+            # 0. Mirror padding for rotation. About ~100 padding on each side needed for 45 degree rotation case.
+            image = transforms.functional.pad(image, padding=100, padding_mode="reflect")
+            segmentation = transforms.functional.pad(segmentation, padding=100, padding_mode="reflect")
+
+            # 1. Rotation + Center Crop
+            # if random.random() > 0.5: # Adjust
+            # angle = random.randint(-180, 180) # Adjust
+            angle = random.choice([-180, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180])
+            image = TF.rotate(image, angle)
+            segmentation = TF.rotate(segmentation, angle)
+            # Center crop
+            image = TF.center_crop(image, input_img_size)
+            segmentation = TF.center_crop(segmentation, input_img_size)
+
+            # 2. Random resize crop: simulate "zoom-in" + resize of satellite images # COMMENTED OUT: TEST IMAGES ARE RATHER ZOOMED "OUT"!
+            if input_img_size == list(resize_to): # if (400, 400) == (400, 400), otherwise 3. Random crop will give a too small image
+                i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.5, 1.0), ratio=(1., 1.))
+                image = TF.resized_crop(image, top=i, left=j, height=h, width=w, size=input_img_size)  # Resize to input image size
+                segmentation = TF.resized_crop(segmentation, top=i, left=j, height=h, width=w, size=input_img_size)
+
+            # 3. Random crop ("zooms in", to predict on patches)
+            i, j, h, w = transforms.RandomCrop.get_params(image, resize_to) # crop to desired size
+            image = transforms.functional.crop(image, i, j, h, w)
+            segmentation = transforms.functional.crop(segmentation, i, j, h, w)
+            
+            # 4. Horizontal flip
             if random.random() > 0.5: # Adjust prob.
                 image = TF.hflip(image)
                 segmentation = TF.hflip(segmentation)
 
-            # 4. Vertical flip
+            # 5. Vertical flip
             if random.random() > 0.5: # Adjust prob.
                 image = TF.vflip(image)
                 segmentation = TF.vflip(segmentation)
 
-            # 5. Random Grayscale
+            # # 6. Random Grayscale
             # if random.random() > 0.5:
             #     image = TF.rgb_to_grayscale(image, num_output_channels=3)
             #     # not needed for segmentation mask        
 
-            # 6. Gaussian Blur
-            # if random.random() > 0.5:
-            #     sigma = random.uniform(0.1, 0.5)
-            #     kernel_size = random.randrange(3, 10, 2)
-            #     image = TF.gaussian_blur(image, kernel_size=kernel_size, sigma=sigma)
+            # 7. Gaussian Blur
+            if random.random() > 0.5:
+                sigma = random.uniform(0.1, 0.5)
+                kernel_size = random.randrange(3, 10, 2)
+                image = TF.gaussian_blur(image, kernel_size=kernel_size, sigma=sigma)
                 # not needed for segmentation mask
 
-            # 7. ColorJitter: Adjust brightness, contrast, saturation, hue
+            # 8. ColorJitter: Adjust brightness, contrast, saturation, hue
             if random.random() > 0.5:
                 brightness = random.uniform(0.8, 1.2)
                 image = TF.adjust_brightness(image, brightness_factor=brightness)
@@ -83,15 +93,15 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
 
                 # hue = random.uniform(0)
                 # image = TF.adjust_hue(image, hue_factor=hue)
-                #not needed for segmentation
+                # # not needed for segmentation
             
-            # 8. Sharpness
+            # 9. Sharpness
             if random.random() > 0.5:
                 sharpness = random.uniform(0.8, 2)
                 image = TF.adjust_sharpness(image, sharpness_factor=sharpness)
                 # not needed for segmentation
 
-            # # 9. Equalize
+            # # 10. Equalize
             # if random.random() > 0.5:
             #     image = TF.equalize(image)
             #     # not needed for segementation
@@ -105,29 +115,33 @@ def transform_fn(image: PIL or torch.tensor or np.array, segmentation: PIL or to
         image = TF.normalize(image, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         # not needed for segmentation
 
+        # ONLY TO TRAIN IMAGES!
+        if train:
+            # 5. Random Erasing
+            # Randomly erase a square of scale 0.1, value=None -> random values.
+            i, j, h, w, v = transforms.RandomErasing.get_params(image, scale=(0.1, 0.1), ratio=(1, 1), value=None)
+            image = TF.erase(image, i=i, j=j, h=h, w=w, v=v)
+
+
         return image, segmentation
 
 
 
-def test_transform_fn(image: PIL or torch.tensor, resize_to=(400, 400)):
+def test_transform_fn(image: PIL or torch.tensor, resize_to=None):
         """preprocessing for image in test:
         -> Input: PIL or tensor, Output: PIL or tensor"""
 
         img_size = TF._get_image_size(image) # Get Size of Input Image (Tuple)
         
-        # Validation Augmentation
-        # 1. Resizing
-        size = resize_to # Adjust
-        image = TF.resize(image, size)
+        if resize_to is not None:
+            # 0. Resizing
+            size = resize_to # Adjust
+            image = TF.resize(image, size)
 
-        # # 2. Crop
-        # out_size = resize_to # Adjust
-        # image = TF.center_crop(image, out_size)
-
-        # 3. ToTensor
+        # 1. ToTensor
         image = TF.to_tensor(image)
 
-        # 4. Normalize
+        # 2. Normalize
         image = TF.normalize(image, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
         return image

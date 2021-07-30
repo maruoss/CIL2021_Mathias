@@ -22,7 +22,7 @@ class BCEDiceLoss_Logits(nn.Module):
         self.smooth = smooth
         self.p = p
         self.reduction = reduction
-        self.bcelogit = nn.BCEWithLogitsLoss() #ADDED BCEWITHLOGITLOSS
+        self.bcelogit = nn.BCEWithLogitsLoss() #ADDED BCEWITHLOGITLOSS (can use pos_weight=torch.tensor(4))
         self.weight = weight_dice # Weight of DiceLoss (1 - Weight: BCELoss)
 
     def forward(self, predict, target):

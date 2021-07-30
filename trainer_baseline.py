@@ -6,10 +6,8 @@ import matplotlib.pyplot as plt
 from trainer_visualizer import show_val_samples
 from torch.utils.tensorboard import SummaryWriter
 import copy
-from test_augmentation import test_augmentation
-from patch_test_augmentation import patch_test_augmentation
 
-def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs, comment:str):
+def train_baseline(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, optimizer, device, n_epochs, comment:str):
     # training loop
     # logdir = 'tensorboard/100dice.lr0.001.batch8.img400.ep50'
     writer = SummaryWriter(comment=comment)  # tensorboard writer (can also log images)
@@ -35,20 +33,11 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
             optimizer.zero_grad()  # zero out gradients
             y = y.to(device)
             x = x.to(device) # add to device here -> faster than in Dataset itself!
-            # y_hat = model(x)["out"]  # forward pass #MATHIAS: need ["out"] for deeplabv3
+            y_hat = model(x)  # forward pass #MATHIAS: need ["out"] for deeplabv3
             # # ADJUST: Round groundtruth to 0, 1? 
             # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF
-            # loss = loss_fn(y_hat, y)
-            model_output = model(x) # Save ordered dict with outputs of classifier and aux classifier
-            y_hat = model_output["out"] # access output of main classifier
-            aux_output = model_output["aux"] # access output of aux classifier, only relevant for finetuning, doesnt seem to change a lot though
-            loss = loss_fn(y_hat, y) + 0.4 * loss_fn(aux_output, y)
-            # Patch loss (commented out, seems to not influence training?)
-            # y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
-            # y_patched = nn.functional.avg_pool2d(y, 16)
-            # loss2 = loss_fn(y_hat_patched, y_patched)
-            ##
-            # loss = 0.5 * loss1 + 0.5 * loss2 # Pixel loss and patch loss
+            loss = loss_fn(y_hat, y)
+   
             loss.backward()  # backward pass
             optimizer.step()  # take gradient step, optimize weights
 
@@ -71,21 +60,10 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
                 x = x.to(device) # add to device here -> faster than in Dataset itself!
                 y = y.to(device)
                 # logits of pixel being 0 or 1:
-                # y_hat = model(x)["out"] # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
+                y_hat = model(x) # forward pass #MATHIAS: added "out". removed torch.sigmoid -> logits are needed for loss_fn
                 # # ADJUST: Round groundtruth to 0, 1? 
                 # y = (y > CUTOFF).float() ###################################################### 0, 1 TARGET rounded on CUTOFF 
-                # loss = loss_fn(y_hat, y)
-                model_output = model(x) # Save ordered dict with outputs of classifier and aux classifier
-                y_hat = model_output["out"] # access output of main classifier
-                # y_hat = test_augmentation(x, model=model, device=device) # TEST AUGMENTATION
-                aux_output = model_output["aux"] # access output of aux classifier, only relevant if finetuning
-                loss = loss_fn(y_hat, y) + 0.4 * loss_fn(aux_output, y)
-                # Patch loss
-                # y_hat_patched = nn.functional.avg_pool2d(y_hat, 16)
-                # y_patched = nn.functional.avg_pool2d(y, 16)
-                # loss2 = loss_fn(y_hat_patched, y_patched)
-                ##
-                # loss = 0.5 * loss1 + 0.5 * loss2 # Pixel loss and patch loss
+                loss = loss_fn(y_hat, y)
                 
                 # log partial metrics
                 metrics['val_loss'].append(loss.item())
@@ -134,13 +112,13 @@ def train_model(train_dataloader, eval_dataloader, model, loss_fn, metric_fns, o
     print('Best validation loss: {:.4f} after {} epochs'.format(best_val_loss, best_epoch))
     print(f"Model returned after {best_epoch} epochs")
 
-    # Show plot for losses
-    plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
-    plt.plot([v['val_loss'] for k, v in history.items()], label='Validation Loss')
-    plt.ylabel('Loss')
-    plt.xlabel('Epochs')
-    plt.legend()
-    plt.show()
+    # # Show plot for losses
+    # plt.plot([v['loss'] for k, v in history.items()], label='Training Loss')
+    # plt.plot([v['val_loss'] for k, v in history.items()], label='Validation Loss')
+    # plt.ylabel('Loss')
+    # plt.xlabel('Epochs')
+    # plt.legend()
+    # plt.show()
 
     # Show plots for all additional metrics # UNCOMMENT/ COMMENT OUT
     # for k, _ in metric_fns.items():
