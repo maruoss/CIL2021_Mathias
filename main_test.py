@@ -184,7 +184,7 @@ comment = "" + hyperparam_string
 # Train
 # model =, since train_model returns model with best val_loss: "early stopped model"
 train_test(train_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=2, comment=comment)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=1, comment=comment)
 
 # %% Save model for tinetuning conv layers
 # torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch8img400+FINE.e100lr.00001.batch2img256_fullaug.pt")
@@ -247,12 +247,13 @@ with torch.no_grad():  # do not keep track of gradients
         print("x shape:", x.shape)
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
         # PATCH + TEST AUGMENTATION:
-        # test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(400, 400))
+        test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(400, 400))
         # print("test pred shape:", test_pred.shape)
         # Standard prediction:
-        x = x.to(default_device)
+        # x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
-        test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
+        test_pred = torch.sigmoid(test_pred) # SIGMOID WHEN USING TEST AUGMENTATION
+        # test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
         test_pred_list.append(test_pred) # append to list
 
 # %%

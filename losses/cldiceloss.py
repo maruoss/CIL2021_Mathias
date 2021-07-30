@@ -86,11 +86,14 @@ class SoftDiceCLDice(nn.Module):
         # tprec = (torch.sum(torch.multiply(skel_pred, y_true)[:,0]) + self.smooth) / (torch.sum(skel_pred[:,0]) + self.smooth)    
         # tsens = (torch.sum(torch.multiply(skel_true, y_pred)[:,0]) + self.smooth) / (torch.sum(skel_true[:,0]) + self.smooth)    
         tprec = (torch.sum(torch.multiply(skel_pred, y_true), dim=1) + self.smooth) / (torch.sum(skel_pred, dim=1) + self.smooth)    
-        tsens = (torch.sum(torch.multiply(skel_true, y_pred), dim=1) + self.smooth) / (torch.sum(skel_true, dim=1) + self.smooth)    
+        tsens = (torch.sum(torch.multiply(skel_true, y_pred), dim=1) + self.smooth) / (torch.sum(skel_true, dim=1) + self.smooth)
+        # tprec = (torch.sum(torch.multiply(skel_pred, y_true)) + self.smooth) / (torch.sum(skel_pred) + self.smooth)    
+        # tsens = (torch.sum(torch.multiply(skel_true, y_pred)) + self.smooth) / (torch.sum(skel_true) + self.smooth)       
         # ADJUSTED: removed [:, 0] and added dim=1 for sum
 
 
         cl_dice = 1. - 2.0 * (tprec * tsens) / (tprec + tsens)
+        # cl_dice = 2.0 * (tprec * tsens) / (tprec + tsens)
         cl_dice = cl_dice.mean() #ADJUSTED
         
         return (1.0 - self.alpha) * dice + self.alpha * (cl_dice)

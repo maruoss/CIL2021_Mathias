@@ -337,6 +337,7 @@ with torch.no_grad():  # do not keep track of gradients
         # Standard prediction:
         # x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
+        test_pred = torch.sigmoid(test_pred) # SIGMOID WHEN USING TEST AUGMENTATION
         # test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
         test_pred_list.append(test_pred) # append to list
 

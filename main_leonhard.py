@@ -187,7 +187,7 @@ N_EPOCHS = 100
 # %% ************************* START CASCADING **********************************
 # CASCADE TRAINS 1*************************************
 # Set title for tensorboard
-cascade_title = "_cascade20_RANDRES0510"
+cascade_title = "_cascadeTRAIN_THRESHOLDING"
 # ***************************************************
 name_model = str(model)[:3]
 name_loss = str(loss_fn)[:7]
@@ -215,7 +215,7 @@ val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE,
 LEARNING_RATE = 0.0001
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # NUM EPOCHS
-N_EPOCHS = 300
+N_EPOCHS = 100
 
 # Comments
 name_loss = str(loss_fn)[:7]
@@ -369,6 +369,7 @@ with torch.no_grad():  # do not keep track of gradients
         # Standard prediction:
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
+        # test_pred = torch.sigmoid(test_pred) # SIGMOID WHEN USING TEST AUGMENTATION
         test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
         test_pred_list.append(test_pred) # append to list
 

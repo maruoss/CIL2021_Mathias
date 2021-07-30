@@ -171,6 +171,10 @@ train_image_paths, val_image_paths, train_groundtruth_paths, val_groundtruth_pat
 assert [y[-7:] for y in [str(x) for x in train_image_paths]] == [y[-7:] for y in [str(x) for x in train_groundtruth_paths]]
 assert [y[-7:] for y in [str(x) for x in val_image_paths]] == [y[-7:] for y in [str(x) for x in val_groundtruth_paths]]
 
+# Print length of train/ val sets
+print(len(train_image_paths))
+print(len(val_image_paths))
+
 # %%
 
 # Define device "cuda" for GPU, or "cpu" for CPU
@@ -300,28 +304,40 @@ train_features, train_labels = next(iter(train_dataloader))
 
 len(train_labels.shape)
 
+#%%
+
+(train_labels.sum(dim=1) == train_labels.squeeze(1))
+# %%
+
+train_labels
 
 #%% PATCH TEST AUGMENTATION
 # a = train_features
 
-# fold_params = dict(kernel_size=256, dilation=1, padding=0, stride=36)
-# fold = nn.Fold(output_size=400, **fold_params)
-# unfold = nn.Unfold(**fold_params)
+# # fold_params = dict(kernel_size=256, dilation=1, padding=0, stride=36)
+# # fold = nn.Fold(output_size=400, **fold_params)
+# # unfold = nn.Unfold(**fold_params)
 
-# # divisor
-# input_ones = torch.ones(a.shape, dtype=a.dtype)
-# divisor = fold(unfold(input_ones))
+# # # divisor
+# # input_ones = torch.ones(a.shape, dtype=a.dtype)
+# # divisor = fold(unfold(input_ones))
 
 # model = createDeepLabHead()
 # model.to(default_device)
-# model.load_state_dict(torch.load("state_bcedice0.5auxpatch.e100lr.001.batch8.img400+fine.bcedice0.5.e100.lr.00001bat2img224.pt"))
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400+FINE.e50lr.0001batch2img224.pt"))
 # # Finetuning or Feature extraction? Freeze backbone of resnet101
 # model.eval()
 # with torch.no_grad():
-#     y_hat = patch_test_augmentation(a.to(default_device), model=model, device=default_device, patch_size=(256, 256))
+#     y_hat, divisor = patch_test_augmentation(a.to(default_device), model=model, device=default_device, patch_size=(256, 256))
  
-
+# %%
 # plt.imshow(torch.sigmoid(y_hat)[0][0].cpu(), cmap="gray")
+# plt.show()
+
+# %%
+# torch.unique(divisor)
+# k = torch.sigmoid(y_hat[0])
+# plt.imshow((torch.sigmoid(y_hat[0][0].cpu() * divisor[0][0].cpu()) > 0.25).float(), cmap="gray")
 # plt.show()
 
 
@@ -506,7 +522,10 @@ image = torch.from_numpy(np.moveaxis(np.array(Image.open(image_paths[1])), -1, 0
 # label = torch.unsqueeze(torch.from_numpy(np.array(Image.open(groundtruth_paths[0]))), dim=0)
 # image = train_features[0]
 
-print(image.shape)
+# print(image.shape)
+plt.imshow(torch.moveaxis(image.cpu(), 0, -1))
+plt.show()
+
 # print(label.shape)
 
 # transform = transforms.Compose([transforms.RandomRotation(90)])
@@ -527,10 +546,10 @@ print(image.shape)
 # image = transforms.functional.center_crop(image, (400, 400))
 
 
-# # i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(1.0, 1.0), ratio=(1, 1))
-# # image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
+i, j, h, w = transforms.RandomResizedCrop.get_params(image, scale=(0.5, 0.5), ratio=(1, 1))
+image = transforms.functional.resized_crop(image, i, j, h, w, (400, 400))
 
-# i, j, h, w = transforms.RandomCrop.get_params(image, (256, 256))
+# i, j, h, w = transforms.RandomCrop.get_params(image, (400, 400))
 # image = transforms.functional.crop(image, i, j, h, w)
 
 # i, j, h, w, v = transforms.RandomErasing.get_params(image, scale=(0.1, 0.1), ratio=(1, 1), value=[0])
@@ -552,7 +571,7 @@ plt.show()
 # # train_features.shape
 
 # # TF.to_tensor(train_images)
-
+# list((8,8)) == [8, 8]
 # # a = Image.open(image_paths[1])
 # test = []
 # test.append(train_features)
@@ -867,7 +886,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 # loss_fn = BCEWithLogitsLoss(pos_weight=torch.tensor(2))
 # loss_fn = BinaryDiceLoss_Logits()
 loss_fn = BCEDiceLoss_Logits(weight_dice=0.5) #weight of dce loss in (weight*DiceLoss + (1-weight)*BCELoss)
-# loss_fn = SoftDiceCLDice()
+# loss_fn = SoftDiceCLDice(alpha=1., iter_=4)
 # loss_fn = BCE_SoftDiceCLDice()
 # loss_fn = FocalLoss()
 # loss_fn = BinaryFocalLossWithLogits(alpha=0.25, reduction="mean")
@@ -880,12 +899,12 @@ metric_fns = {'acc': accuracy_fn, "patch_acc": patch_accuracy}
 
 # %%
 # # Load model from saved model to finetune:
-# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400.pt"))
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch8img400_fullaug.pt"))
 # Check if model is on cuda
-# next(model.parameters()).device
+next(model.parameters()).device
 
 # Show summary of model
-summary(model, (4, 3, 256, 256))
+summary(model, (5, 3, 280, 280))
 
 
 # print(model.backbone.conv1)
@@ -895,7 +914,6 @@ summary(model, (4, 3, 256, 256))
 #     print(i)
 
 # str(BCEDiceLoss_Logits(weight_dice=0.8))[:7]
-
 # %%
 name_loss = str(loss_fn)[:7]
 hyperparam_string = f".loss{name_loss}.lr{LEARNING_RATE}.batch{BATCH_SIZE}.img{resize_to[0]}"
@@ -903,10 +921,10 @@ comment = "" + hyperparam_string
 # Train
 # model =, since train_model returns model with best val_loss: "early stopped model"
 model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=model, loss_fn=loss_fn, 
-             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=100, comment=comment)
+             metric_fns=metric_fns, optimizer=optimizer, device=default_device, n_epochs=1, comment=comment)
 
 # %% Save model for tinetuning conv layers
-# torch.save(model.state_dict(), "state_patchaug_bcedice0.5e100lr.001batch8img400_fullaug.pt")
+# torch.save(model.state_dict(), "state_bcedice0.5e100lr.001batch8img400+FINE.e100lr.00001.batch2img256_fullaug.pt")
 
 # %%
 # %load_ext tensorboard
@@ -919,7 +937,8 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 
 # %%
 
-# torch.save(model.state_dict(), "statetest.pt")
+# torch.save(model.state_dict(), "statetest.pt")Bd86bbd5Bd86bbd5
+
 # import torch
 # dict1 = torch.load("statetest.pt")
 # model.load_state_dict(dict1)
@@ -948,6 +967,8 @@ model = train_model(train_dataloader, eval_dataloader=val_dataloader, model=mode
 #     print(k, v)
 
 
+# model.load_state_dict(torch.load("state_bcedice0.5e100lr.001batch32img224+e50lr.001batch8img304+e50lr.001batch8img400+FINE.e50lr.0001batch2img224.pt"))
+
 # ***************************************** PREDICTION ************************************************************
 # Test prediction
 # %% Taken from CIL Tutorial, https://colab.research.google.com/github/dalab/lecture_cil_public/blob/master/exercises/2021/Project_3.ipynb#scrollTo=cKQvTg8gE9JC
@@ -964,7 +985,7 @@ def create_submission(labels, test_filenames, submission_filename):
 
 # Function to show first and last test images and predicted masks
 def show_first_last_pred(pred_torch_list: list, image_list: list, first_last=5):
-    fig, axs = plt.subplots(first_last, 4, figsize=(10, 14))
+    fig, axs = plt.subplots(first_last, 4, figsize=(10, 3*first_last))
     for i in range(first_last):
         # Image plot
         axs[i, 0].imshow(image_list[i])
@@ -979,6 +1000,7 @@ def show_first_last_pred(pred_torch_list: list, image_list: list, first_last=5):
         axs[i, 1].set_axis_off()
         axs[i, 2].set_axis_off()
         axs[i, 3].set_axis_off()
+    plt.show()
 
 # %%
 # Open first test image to have a look at it, resizing
@@ -996,16 +1018,22 @@ test_pred_list = [] # empty list to collect tensor predictions shape [1, 1, H, W
 model.eval() # eval mode
 with torch.no_grad():  # do not keep track of gradients
     for x in tqdm(test_images):
-        x = test_transform_fn(x, resize_to=(resize_to)) # apply test transform first. Resize to same shape model was trained on.
+        x = test_transform_fn(x, resize_to=None) # apply test transform first. Resize to same shape model was trained on.
+        print("x shape:", x.shape)
         x = torch.unsqueeze(x, 0) # unsqueeze first dim. for batch dim
+        # PATCH + TEST AUGMENTATION:
+        # test_pred = patch_test_augmentation(x, model=model, device=default_device, patch_size=(400, 400))
+        # print("test pred shape:", test_pred.shape)
+        # Standard prediction:
         x = x.to(default_device)
         # probability of pixel being 0 or 1: (sigmoid since model outputs logits)
+        # test_pred = torch.sigmoid(test_pred) # SIGMOID WHEN USING TEST AUGMENTATION
         test_pred = torch.sigmoid(model(x)["out"]) # ADJUST: ["out"] only needed for Deeplabv3!. forward pass + sigmoid
         test_pred_list.append(test_pred) # append to list
 
 # %%
 # Show first and last predicted test masks and test images
-show_first_last_pred(test_pred_list, test_images, first_last=3)
+show_first_last_pred(test_pred_list, test_images, first_last=5)
 
 # %%
 #  Convert model outputs to mask labels
